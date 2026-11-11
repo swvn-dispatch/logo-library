@@ -7,10 +7,21 @@ downloaded separately and are not distributed with this repository.
 
 ## Development status
 
-This repository is under construction and is **not yet an installable
-Dispatcharr plugin**. The current code implements a staged catalog snapshot
-and mapping validation core. The manifest, Dispatcharr integration, plugin
-actions, user interface, and release workflows remain to be implemented.
+This repository is under construction. The manifest and initial Dispatcharr
+integration are present, but packaging, release workflows, and live integration
+validation remain outstanding. Do not use it in production yet.
+
+The plugin begins downloading the catalog when enabled. After the download or
+an Update catalog action, click **Reload plugin** and reopen its settings.
+Save the mappings before clicking **Apply changes**. Deleting a row does not
+undo a previously assigned logo. Updating the catalog does not update channel
+logos until Apply changes runs again.
+
+The native dropdowns are not searchable, and Dispatcharr can validate against
+stale per-process field options even after a reload. This is a known upstream
+limitation. A failed settings save must be resolved before applying changes.
+The plugin requires background tasks, a leader service, outbound network access,
+and permission to write copies into `/data/logos`.
 
 Run the offline tests with:
 
@@ -20,4 +31,4 @@ python3 -m unittest discover -s tests -v
 
 Catalog snapshots are currently retained after updates to avoid invalidating
 readers. Snapshot cleanup and disk usage management must be addressed before a
-release. No live Dispatcharr integration has been verified.
+release. No live Dispatcharr integration or minimum supported version has been verified.

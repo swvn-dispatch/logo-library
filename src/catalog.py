@@ -143,7 +143,7 @@ def _extract(archive, destination):
     return count
 
 
-def update_catalog(data_dir, opener=urllib.request.urlopen):
+def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=False):
     """Publish a complete snapshot while retaining the prior one on failure.
 
     Snapshots are immutable and retained so readers that captured an older
@@ -151,6 +151,8 @@ def update_catalog(data_dir, opener=urllib.request.urlopen):
     """
     root = Path(data_dir)
     with catalog_lock(root, exclusive=True):
+        if only_if_missing and current_catalog(root) is not None:
+            return None
         with tempfile.TemporaryDirectory(prefix="catalog-update-", dir=root) as temp:
             temp_path = Path(temp)
             archive = temp_path / "catalog.zip"

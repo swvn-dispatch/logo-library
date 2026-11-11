@@ -1,0 +1,28 @@
+{
+  "name": "Logo Library",
+  "version": "0.1.0",
+  "description": "Map local tv-logos images to Dispatcharr channels",
+  "author": "sethwv",
+  "license": "MIT",
+  "manifest_version": 2,
+  "min_dispatcharr_version": "v0.34.0",
+  "capabilities": ["background_tasks", "persistent_service", "outbound_network", "filesystem_write"],
+  "actions": [
+    {
+      "id": "update_catalog",
+      "label": "Update catalog",
+      "description": "Download the latest tv-logos catalog. Reload the plugin afterward.",
+      "button_label": "Update catalog",
+      "async": true
+    },
+    {
+      "id": "apply_changes",
+      "label": "Apply changes",
+      "description": "Apply saved channel mappings and replace existing channel logos.",
+      "button_label": "Apply changes",
+      "async": true
+    }
+  ],
+  "repo_url": "https://github.com/swvn-dispatch/logo-library",
+  "help_url": "https://github.com/swvn-dispatch/logo-library"
+}

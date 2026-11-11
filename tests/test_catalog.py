@@ -29,6 +29,7 @@ class CatalogTests(unittest.TestCase):
             snapshot = current_catalog(root)
             self.assertEqual(logo_paths(snapshot), ["countries/nordic/a.png"])
             self.assertEqual(resolve_logo(snapshot, "countries/nordic/a.png").read_bytes(), b"image")
+            self.assertIsNone(update_catalog(root, opener(b"invalid"), only_if_missing=True))
 
     def test_failed_update_preserves_previous_snapshot(self):
         with tempfile.TemporaryDirectory() as root:
