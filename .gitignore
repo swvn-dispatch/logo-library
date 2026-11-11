@@ -7,3 +7,8 @@
 .beads-credential-key
 AGENTS.md
 CLAUDE.md
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
