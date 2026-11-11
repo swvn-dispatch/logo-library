@@ -1,7 +1,7 @@
 {
   "name": "Logo Library",
   "version": "0.1.0",
-  "description": "Map local tv-logos images to Dispatcharr channels",
+  "description": "Map logos from local external catalogs to Dispatcharr channels",
   "author": "sethwv",
   "license": "MIT",
   "manifest_version": 2,
@@ -10,9 +10,9 @@
   "actions": [
     {
       "id": "update_catalog",
-      "label": "Update catalog",
+      "label": "Update TV Logos",
       "description": "Download the latest tv-logos catalog. Reload the plugin afterward.",
-      "button_label": "Update catalog",
+      "button_label": "Update TV Logos",
       "async": true
     },
     {

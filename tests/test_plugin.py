@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from src import Plugin
 from src.fields import make_fields
+from src.catalogs import catalog_actions
 
 
 class PluginTests(unittest.TestCase):
@@ -14,6 +15,13 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(manifest["manifest_version"], 2)
         self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes"})
         self.assertTrue(all(action["async"] for action in manifest["actions"]))
+        manifest_actions = {action["id"]: action for action in manifest["actions"]}
+        declared = catalog_actions()
+        self.assertEqual(len({action["id"] for action in declared}), len(declared))
+        self.assertNotIn("apply_changes", {action["id"] for action in declared})
+        self.assertEqual(set(manifest_actions) - {"apply_changes"}, {action["id"] for action in declared})
+        for action in declared:
+            self.assertEqual(manifest_actions[action["id"]], action)
 
     def test_missing_selections_remain_options(self):
         with tempfile.TemporaryDirectory() as root:
@@ -44,9 +52,9 @@ class PluginTests(unittest.TestCase):
         plugin = Plugin()
         calls = []
         with tempfile.TemporaryDirectory() as root:
-            with patch("src.current_catalog", return_value=None):
+            with patch("src.catalogs.tv_logos.current_catalog", return_value=None):
                 plugin.on_leader_acquired({"data_dir": root, "dispatch_task": lambda *args: calls.append(args)})
-            with patch("src.current_catalog", return_value=Path(root)):
+            with patch("src.catalogs.tv_logos.current_catalog", return_value=Path(root)):
                 plugin.on_leader_acquired({"data_dir": root, "dispatch_task": lambda *args: calls.append(args)})
         self.assertEqual(calls, [("update_catalog", {"initial": True})])
 
@@ -60,6 +68,29 @@ class PluginTests(unittest.TestCase):
 
     def test_unknown_action(self):
         self.assertEqual(Plugin().run("unknown", {}, {})["status"], "error")
+
+    def test_catalog_action_is_routed_to_catalog(self):
+        with patch("src.catalogs.tv_logos.update_catalog", return_value=3) as update:
+            result = Plugin().run("update_catalog", {}, {"data_dir": "/test"})
+        self.assertEqual(result["status"], "ok")
+        self.assertIn("3", result["message"])
+        update.assert_called_once_with("/test", only_if_missing=False)
+
+    def test_options_include_multiple_catalog_namespaces(self):
+        class Catalog:
+            accepts_legacy_paths = False
+
+            def __init__(self, catalog_id):
+                self.id = self.label = catalog_id
+
+            def options(self, data_dir):
+                return ["same.png"]
+
+        with tempfile.TemporaryDirectory() as root, patch("src.catalogs.CATALOGS", (Catalog("one"), Catalog("two"))):
+            fields = make_fields(root, {}, [])
+        table = next(field for field in fields if field["id"] == "mappings")
+        self.assertEqual([option["value"] for option in table["columns"][1]["options"]],
+                         ["one:same.png", "two:same.png"])
 
 
 if __name__ == "__main__":

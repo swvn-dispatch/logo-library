@@ -1,18 +1,25 @@
 """Build native Dispatcharr settings fields from the current catalog."""
 
-from .catalog import CatalogError, catalog_lock, current_catalog, logo_paths
+import logging
+
+from . import catalogs
+
+logger = logging.getLogger(__name__)
 
 
 def make_fields(data_dir, settings, channels):
-    try:
-        with catalog_lock(data_dir, exclusive=False):
-            logos = logo_paths(current_catalog(data_dir))
-    except CatalogError:
-        logos = []
+    logo_options = []
+    for catalog in catalogs.CATALOGS:
+        try:
+            logo_options.extend({"value": f"{catalog.id}:{path}", "label": f"{catalog.label} / {path}"}
+                                for path in catalog.options(data_dir))
+        except (OSError, ValueError):
+            logger.warning("Could not list logos from catalog %s", catalog.id, exc_info=True)
+        except Exception:
+            logger.exception("Catalog %s failed to list logos", catalog.id)
     channel_options = list(channels)
-    logo_options = [{"value": path, "label": path} for path in logos]
     channel_ids = {option["value"] for option in channel_options}
-    logo_ids = set(logos)
+    logo_ids = {option["value"] for option in logo_options}
     rows = settings.get("mappings", [])
     if not isinstance(rows, list):
         rows = []
@@ -25,7 +32,13 @@ def make_fields(data_dir, settings, channels):
             channel_options.append({"value": str(channel), "label": f"Missing channel (ID {channel})"})
         if isinstance(logo, str) and logo and logo not in logo_ids:
             logo_ids.add(logo)
-            logo_options.append({"value": logo, "label": f"Missing: {logo}"})
+            try:
+                catalog, path = catalogs.parse_logo(logo)
+                canonical = f"{catalog.id}:{path}"
+                label = f"{catalog.label} / {path}" if canonical in logo_ids else f"Missing: {logo}"
+            except ValueError:
+                label = f"Missing: {logo}"
+            logo_options.append({"value": logo, "label": label})
     return [
         {"id": "instructions", "type": "info", "label": "Catalog and mappings",
          "description": "After the catalog is downloaded or refreshed, click Reload plugin and reopen settings. Dropdowns are not searchable."},

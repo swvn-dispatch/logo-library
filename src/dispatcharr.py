@@ -25,7 +25,10 @@ def assign_logo(channel_id, relative, image, logo_dir=LOGO_DIR):
     logo_dir.mkdir(parents=True, exist_ok=True)
     # Prefix prevents collisions with uploads and the path hash supports shared logos.
     digest = hashlib.sha256(relative.encode("utf-8")).hexdigest()
-    destination = logo_dir / f"logo-library-{digest}.png"
+    extension = image.suffix.lower()
+    if extension not in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+        raise ValueError("Unsupported logo image format")
+    destination = logo_dir / f"logo-library-{digest}{extension}"
     with transaction.atomic():
         channel = Channel.objects.select_for_update().filter(pk=channel_pk).first()
         if channel is None:

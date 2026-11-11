@@ -5,7 +5,7 @@ import tempfile
 import unittest
 import zipfile
 
-from src.catalog import CatalogError, current_catalog, logo_paths, resolve_logo, update_catalog
+from src.catalogs.tv_logos.catalog import CatalogError, current_catalog, logo_paths, resolve_logo, update_catalog
 
 
 def archive(files):

@@ -1,9 +1,8 @@
 # Logo Library
 
 A [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) plugin for mapping
-channel logos from the [tv-logo/tv-logos](https://github.com/tv-logo/tv-logos)
-catalog. Choose a channel and a logo path in the plugin settings, then apply
-your saved mappings to Dispatcharr.
+channel logos from logo catalogs. Choose a channel and a catalog logo in
+the plugin settings, then apply your saved mappings to Dispatcharr.
 
 > **Development preview:** Logo Library has not yet been validated against a
 > running Dispatcharr instance. The minimum Dispatcharr version and release
@@ -19,16 +18,16 @@ This project is maintained in my spare time. If it's saved you some headaches, a
 
 ## How it works
 
-When enabled, Logo Library queues a download of the tv-logos catalog into its
-persistent plugin storage. Selected images are copied into Dispatcharr's local
-logo directory when mappings are applied, so assigned logos do not depend on
-the plugin being enabled or on the upstream repository being reachable.
+Logo catalogs manage their own storage and actions. Selected images are copied
+into Dispatcharr's local logo directory when mappings are applied, so assigned
+logos do not depend on the plugin being enabled or on a catalog being reachable.
 
 - Map multiple channels to the same logo.
 - Replace existing channel logos, including logos on automatically created channels.
 - Keep mappings in the settings table after applying them.
-- Update the local catalog manually with the **Update catalog** action.
-- Use **Apply changes** to refresh assigned copies after a catalog update.
+- Select logos from multiple catalogs in the same mapping table.
+- Update a logo catalog using its action.
+- Use **Apply changes** to refresh assigned copies after catalog updates.
 
 Automatic assignment is planned but is not implemented.
 
@@ -36,9 +35,9 @@ Automatic assignment is planned but is not implemented.
 
 1. Enable Logo Library and approve its requested capabilities. The initial
    catalog download runs in the background.
-2. Once the download completes, click **Reload plugin** and reopen its settings.
+2. Once the initial catalog download completes, click **Reload plugin** and reopen its settings.
 3. Under **Manual assignment**, add a row and select a channel and logo path.
-   Logo paths are relative to the tv-logos repository, including nested folders.
+   The dropdown identifies each logo by catalog and catalog-relative path.
 4. Save the plugin settings, then run **Apply changes**. Review the action
    result for skipped rows and errors.
 
@@ -48,7 +47,7 @@ can still be applied. Removing a row stops managing that channel but does not
 remove or restore its previously assigned logo. Disabling or uninstalling the
 plugin does not remove assigned copies.
 
-After running **Update catalog**, reload the plugin and reopen its settings
+After updating a catalog, reload the plugin and reopen its settings
 before editing mappings. Catalog updates do not change assigned logos until you
 run **Apply changes** again. Image caches may delay visible changes.
 
@@ -70,34 +69,21 @@ capabilities:
 |---|---|
 | Background tasks | Download the catalog and apply mappings without blocking the UI. |
 | Persistent service | Use Dispatcharr's leader lifecycle to queue the initial download. |
-| Outbound network | Download the tv-logos catalog. |
+| Outbound network | Download logo catalogs. |
 | Filesystem write | Copy selected logos into `/data/logos` for Dispatcharr to serve. |
 
-The current and previous catalog snapshots are retained. An update also needs
-temporary disk space for the archive and extracted images.
+Logo catalogs may need persistent and temporary disk space.
 
-## Logo attribution
+## Logo catalog credits
 
-The logo catalog is maintained by [tv-logo/tv-logos](https://github.com/tv-logo/tv-logos).
-Images are downloaded separately and are not bundled in this plugin. Refer to
-the upstream README for attribution and usage terms.
+### TV Logos
 
-## Development
+The TV Logos catalog accesses images maintained by
+[tv-logo/tv-logos](https://github.com/tv-logo/tv-logos). Logo Library does not
+bundle or distribute its images. It provides tools to access the catalog and
+map its logos to channels within Dispatcharr. Refer to the upstream project's
+README for attribution and usage terms.
 
-Run the offline tests with:
-
-```sh
-python3 -m unittest discover -s tests -v
-```
-
-Build a local archive with `./package.sh`. To package a specific version
-without changing the source manifest, use `./package.sh --version 0.1.0`.
-
-Pushes to `dev` trigger tests and a versioned GitHub prerelease. The prerelease
-version uses the latest stable version and the source commit's short SHA. Its
-ZIP contains the plugin under `logo_library`. The release workflow notifies the
-plugin registry when the aggregator token is available. Dev builds are for
-testing and may change without notice.
-
-The dev rebase workflow updates the remote `dev` branch on pushes to `main` and
-stops on conflicts rather than resolving them automatically.
+The catalog is downloaded locally when the plugin is enabled. Use
+**Update TV Logos** to refresh it. The current and previous snapshots are
+retained, and updates need temporary space for the archive and extracted images.

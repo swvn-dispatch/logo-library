@@ -17,7 +17,7 @@ class PackageTests(unittest.TestCase):
             with zipfile.ZipFile(path) as archive:
                 names = archive.namelist()
                 self.assertIn("logo_library/__init__.py", names)
-                self.assertIn("logo_library/catalog.py", names)
+                self.assertIn("logo_library/catalogs/tv_logos/catalog.py", names)
                 self.assertIn("logo_library/plugin.json", names)
                 self.assertFalse(any("__pycache__" in name or name.endswith(".pyc") for name in names))
                 manifest = json.loads(archive.read("logo_library/plugin.json"))
