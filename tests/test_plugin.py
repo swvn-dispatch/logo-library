@@ -18,10 +18,27 @@ class PluginTests(unittest.TestCase):
     def test_missing_selections_remain_options(self):
         with tempfile.TemporaryDirectory() as root:
             fields = make_fields(root, {"mappings": [{"channel": "123", "logo": "old/a.png"}]}, [])
-            self.assertIn("Reload plugin", fields[0]["description"])
-            columns = fields[1]["columns"]
+            by_id = {field["id"]: field for field in fields}
+            self.assertIn("Reload plugin", by_id["instructions"]["description"])
+            columns = by_id["mappings"]["columns"]
             self.assertEqual(columns[0]["options"][0]["value"], "123")
             self.assertEqual(columns[1]["options"][0]["value"], "old/a.png")
+
+    def test_settings_sections_and_top_notice(self):
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, {}, [])
+        self.assertEqual([field["id"] for field in fields], [
+            "instructions", "manual_assignment", "manual_instructions", "mappings",
+            "automatic_assignment", "automatic_coming_soon",
+        ])
+        by_id = {field["id"]: field for field in fields}
+        self.assertNotIn("section", by_id["instructions"])
+        self.assertEqual(by_id["manual_assignment"]["type"], "section")
+        self.assertEqual(by_id["manual_instructions"]["section"], "manual_assignment")
+        self.assertEqual(by_id["mappings"]["section"], "manual_assignment")
+        self.assertEqual(by_id["automatic_assignment"]["type"], "section")
+        self.assertEqual(by_id["automatic_coming_soon"]["section"], "automatic_assignment")
+        self.assertIn("coming soon", by_id["automatic_coming_soon"]["description"])
 
     def test_leader_initial_download_is_queued_only_when_missing(self):
         plugin = Plugin()

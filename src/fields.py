@@ -28,10 +28,16 @@ def make_fields(data_dir, settings, channels):
             logo_options.append({"value": logo, "label": f"Missing: {logo}"})
     return [
         {"id": "instructions", "type": "info", "label": "Catalog and mappings",
-         "description": "After the catalog is downloaded or refreshed, click Reload plugin and reopen settings. Save mappings before applying. Dropdowns are not searchable."},
-        {"id": "mappings", "type": "table", "label": "Channel logo mappings", "default": [],
+         "description": "After the catalog is downloaded or refreshed, click Reload plugin and reopen settings. Dropdowns are not searchable."},
+        {"id": "manual_assignment", "type": "section", "label": "Manual assignment", "collapsed": False},
+        {"id": "manual_instructions", "type": "info", "section": "manual_assignment",
+         "description": "Save mappings before running Apply changes. Removing a mapping does not remove the channel's assigned logo."},
+        {"id": "mappings", "type": "table", "section": "manual_assignment", "label": "Channel logo mappings", "default": [],
          "columns": [
              {"id": "channel", "label": "Channel", "type": "select", "options": channel_options},
              {"id": "logo", "label": "Logo path", "type": "select", "options": logo_options},
          ]},
+        {"id": "automatic_assignment", "type": "section", "label": "Automatic assignment", "collapsed": False},
+        {"id": "automatic_coming_soon", "type": "info", "section": "automatic_assignment",
+         "description": "Automatic assignment is coming soon."},
     ]
