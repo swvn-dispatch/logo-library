@@ -1,9 +1,9 @@
 """Conservative exact matching against catalog-relative logo paths."""
 
 from collections import defaultdict
-from pathlib import PurePosixPath
 import unicodedata
 
+from .catalog_scope import scoped_paths
 
 # TV Logos uses these country suffixes in the corresponding directories.
 # Do not strip an unrecognized suffix: it may be part of a network name.
@@ -49,19 +49,8 @@ def build_name_index(paths, catalog_id, scope=""):
     A scope matches whole path components, never a similarly prefixed directory.
     Callers should pass paths from the selected catalog's existing index.
     """
-    scope_path = PurePosixPath(scope)
-    if scope_path.is_absolute() or ".." in scope_path.parts or "\\" in scope or "\x00" in scope:
-        raise ValueError("Invalid catalog path scope")
-    scope_parts = scope_path.parts
     index = defaultdict(set)
-    for value in paths:
-        if not isinstance(value, str) or "\\" in value or "\x00" in value:
-            continue
-        path = PurePosixPath(value)
-        if path.is_absolute() or ".." in path.parts or path.parts[:len(scope_parts)] != scope_parts:
-            continue
-        if len(path.parts) <= len(scope_parts):
-            continue
+    for value, path in scoped_paths(paths, scope):
         name = normalize_name(_filename_name(path, catalog_id))
         if name:
             index[name].add(value)

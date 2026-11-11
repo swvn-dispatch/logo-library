@@ -40,6 +40,13 @@ country directories; `hd`, `hz`, and `horizontal` filename suffixes are treated
 as variants. Multiple matching paths are ambiguous and are not selected. Other
 country suffixes remain part of the name until explicitly supported.
 
+The in-development call-sign matcher only considers uppercase US-style `K` or
+`W` call signs in channel names and station-specific TV Logos paths under
+`countries/united-states/us-local`. The configured directory scope narrows those
+paths further. Multiple call signs or matching logo variants are skipped. This
+heuristic does not verify station identity and does not support Canadian call
+signs or guide metadata yet.
+
 ## Catalog filters
 
 Use the collapsed **Catalog filters** section to narrow the logo choices in the
