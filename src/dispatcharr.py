@@ -79,11 +79,13 @@ def channel_options():
 
 
 def group_options():
-    """List stable group IDs, including groups with no current channels."""
-    from apps.channels.models import ChannelGroup
+    """List groups used by channels after applying group overrides."""
+    from apps.channels.managers import with_effective_values
+    from apps.channels.models import Channel, ChannelGroup
 
+    group_ids = with_effective_values(Channel.objects.all()).order_by().values_list("effective_channel_group_id", flat=True).distinct()
     return [{"value": str(group.id), "label": group.name}
-            for group in ChannelGroup.objects.order_by("name", "id")]
+            for group in ChannelGroup.objects.filter(pk__in=group_ids).order_by("name", "id")]
 
 
 def automatic_channels():
@@ -119,7 +121,7 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, expected, identity
         if not ChannelGroup.objects.filter(pk=group_id).exists():
             return "missing_group"
         groups, _ = compile_groups(settings.get("automatic_groups", []), [group_id],
-                                   {catalog.id for catalog in catalogs.CATALOGS})
+                                   {catalog.id for catalog in catalogs.CATALOGS}, settings)
         if groups.get(group_id) != expected:
             return "settings_changed"
         channel = Channel.objects.select_for_update().filter(pk=channel_id).first()

@@ -74,7 +74,8 @@ class AutomaticRunTests(unittest.TestCase):
             self.run_match([])
 
     def test_replace_policy_and_fuzzy_report(self):
-        self.settings["automatic_groups"][0].update(strategy="fuzzy", threshold=99, replace=True)
+        self.settings["automatic_groups"][0].update(strategy="fuzzy", replace=True)
+        self.settings["automatic_threshold"] = 99
         result = self.run_match([{"id": 1, "group_id": 1, "name": "ABCD", "logo_id": 2}])
         self.assertEqual(result["channels"][0]["reason"], "below_threshold")
         self.assertLess(result["channels"][0]["score"], 99)

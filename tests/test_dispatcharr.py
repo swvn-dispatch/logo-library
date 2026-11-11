@@ -23,7 +23,7 @@ class DispatcharrTests(unittest.TestCase):
     def test_guard_rechecks_current_settings_and_effective_values(self):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
         expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
-                    "prefix": "", "threshold": None}
+                    "prefix": "", "threshold": 90}
         plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
         plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
         channel = types.SimpleNamespace(channel_group_id=8, name="Raw", logo_id=None)
@@ -59,6 +59,9 @@ class DispatcharrTests(unittest.TestCase):
             override.channel_group_id = 3
             self.assertEqual(guarded_assign_logo(*args), "channel_changed")
             override.channel_group_id = 2
+            settings["automatic_prefix"] = "US:"
+            self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+            settings.pop("automatic_prefix")
             settings["automatic_groups"].append(dict(settings["automatic_groups"][0]))
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings["automatic_groups"].pop()
@@ -70,14 +73,22 @@ class DispatcharrTests(unittest.TestCase):
 
     def test_group_options_use_ids_and_current_names(self):
         group_model = MagicMock()
-        group_model.objects.order_by.return_value = [types.SimpleNamespace(id=7, name="Renamed")]
+        group_model.objects.filter.return_value.order_by.return_value = [types.SimpleNamespace(id=7, name="Renamed")]
         models = types.ModuleType("apps.channels.models")
         models.ChannelGroup = group_model
+        models.Channel = MagicMock()
+        managers = types.ModuleType("apps.channels.managers")
+        managers.with_effective_values = MagicMock()
+        queryset = managers.with_effective_values.return_value.order_by.return_value
+        ids = queryset.values_list.return_value.distinct.return_value
         modules = {"apps": types.ModuleType("apps"), "apps.channels": types.ModuleType("apps.channels"),
-                   "apps.channels.models": models}
+                   "apps.channels.models": models, "apps.channels.managers": managers}
         with patch.dict(sys.modules, modules):
             self.assertEqual(group_options(), [{"value": "7", "label": "Renamed"}])
-        group_model.objects.order_by.assert_called_once_with("name", "id")
+        managers.with_effective_values.return_value.order_by.assert_called_once_with()
+        queryset.values_list.assert_called_once_with("effective_channel_group_id", flat=True)
+        group_model.objects.filter.assert_called_once_with(pk__in=ids)
+        group_model.objects.filter.return_value.order_by.assert_called_once_with("name", "id")
 
     def test_channel_options_use_effective_number_order(self):
         rows = [types.SimpleNamespace(id=1, effective_name="First", effective_channel_number=2.5),

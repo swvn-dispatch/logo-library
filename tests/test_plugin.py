@@ -27,7 +27,9 @@ class PluginTests(unittest.TestCase):
         for action in declared:
             self.assertEqual(manifest_actions[action["id"]], action)
         self.assertEqual(manifest_actions["update_catalog"]["button_color"], "teal")
-        self.assertEqual(manifest_actions["update_catalog"]["button_label"], "Refresh TV Logos library")
+        self.assertEqual(manifest_actions["update_catalog"]["button_label"], "Refresh tv-logos")
+        self.assertEqual(manifest_actions["apply_changes"]["button_label"], "Manual Match")
+        self.assertEqual(manifest_actions["run_automatic"]["button_label"], "Auto Match")
 
     def test_missing_selections_remain_options(self):
         with tempfile.TemporaryDirectory() as root:
@@ -43,7 +45,9 @@ class PluginTests(unittest.TestCase):
             fields = make_fields(root, {}, [])
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
-            "automatic_assignment", "automatic_coming_soon", "automatic_groups", "catalog_filters_section",
+            "automatic_assignment", "automatic_coming_soon", "automatic_group_help", "automatic_strategy_help",
+            "automatic_scope_help", "automatic_replace_help", "automatic_groups", "automatic_prefix",
+            "automatic_threshold", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
         ])
         by_id = {field["id"]: field for field in fields}
@@ -54,6 +58,9 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_coming_soon"]["section"], "automatic_assignment")
         self.assertIn("Groups without an enabled row are skipped", by_id["automatic_coming_soon"]["description"])
+        self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
+                         ["group", "strategy", "scope", "replace"])
+        self.assertEqual(by_id["automatic_threshold"]["default"], 90)
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
         self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
         self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
@@ -64,9 +71,9 @@ class PluginTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             fields = make_fields(root, settings, [], [{"value": "1", "label": "Renamed"}])
         table = next(field for field in fields if field["id"] == "automatic_groups")
-        self.assertEqual(table["columns"][0]["options"], [
-            {"value": "1", "label": "Renamed"}, {"value": "9", "label": "Missing group (ID 9)"},
-        ])
+        self.assertEqual(table["columns"][0]["options"], [{"value": "1", "label": "Renamed"}])
+        notice = next(field for field in fields if field["id"] == "automatic_missing_groups")
+        self.assertIn("9", notice["description"])
 
     def test_filters_keep_saved_logo_and_report_invalid_regex(self):
         class Catalog:

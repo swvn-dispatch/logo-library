@@ -10,23 +10,23 @@
   "actions": [
     {
       "id": "apply_changes",
-      "label": "Apply changes",
+      "label": "Manual Match",
       "description": "Apply saved channel mappings and replace existing channel logos.",
-      "button_label": "Apply changes",
+      "button_label": "Manual Match",
       "async": true
     },
     {
       "id": "run_automatic",
-      "label": "Run automatic matching",
+      "label": "Auto Match",
       "description": "Match and assign logos for configured groups using saved settings.",
-      "button_label": "Run automatic matching",
+      "button_label": "Auto Match",
       "async": true
     },
     {
       "id": "update_catalog",
-      "label": "Refresh TV Logos library",
+      "label": "Refresh tv-logos",
       "description": "Download the latest tv-logos catalog.",
-      "button_label": "Refresh TV Logos library",
+      "button_label": "Refresh tv-logos",
       "button_color": "teal",
       "async": true
     }

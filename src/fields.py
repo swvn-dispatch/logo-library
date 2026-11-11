@@ -63,20 +63,20 @@ def make_fields(data_dir, settings, channels, groups=()):
     group_options = list(groups)
     group_ids = {option["value"] for option in group_options}
     group_rows = settings.get("automatic_groups", [])
+    unavailable_groups = set()
     if isinstance(group_rows, list):
         for row in group_rows:
             if not isinstance(row, dict):
                 continue
             group = row.get("group")
             if group not in (None, "") and str(group) not in group_ids:
-                group_ids.add(str(group))
-                group_options.append({"value": str(group), "label": f"Missing group (ID {group})"})
+                unavailable_groups.add(str(group))
     return [
         {"id": "instructions", "type": "info", "label": "Catalog and mappings",
          "description": "After a catalog is downloaded, refreshed, or indexed, it is recommended to click Reload plugin."},
         {"id": "manual_assignment", "type": "section", "label": "Manual assignment", "collapsed": False},
         {"id": "manual_instructions", "type": "info", "section": "manual_assignment",
-         "description": "Save mappings before running Apply changes. Removing a mapping does not remove the channel's assigned logo."},
+         "description": "Save mappings before running Manual Match. Removing a mapping does not remove the channel's assigned logo."},
         {"id": "mappings", "type": "table", "section": "manual_assignment", "label": "Channel logo mappings", "default": [],
          "columns": [
              {"id": "channel", "label": "Channel", "type": "select", "options": channel_options},
@@ -84,7 +84,17 @@ def make_fields(data_dir, settings, channels, groups=()):
          ]},
         {"id": "automatic_assignment", "type": "section", "label": "Automatic assignment", "collapsed": False},
         {"id": "automatic_coming_soon", "type": "info", "section": "automatic_assignment",
-         "description": "Configure one row per group and save before running automatic matching. Groups without an enabled row are skipped. Saved manual mappings take priority. Path scope is a catalog-relative directory; leave it blank for the entire catalog. Prefix removal applies to name strategies; threshold applies only to fuzzy matching."},
+         "description": "Configure one row per group and save before running Auto Match. Groups without an enabled row are skipped. Saved manual mappings take priority."},
+        {"id": "automatic_group_help", "type": "info", "section": "automatic_assignment",
+         "description": "Channel group: select a group currently used by a channel."},
+        {"id": "automatic_strategy_help", "type": "info", "section": "automatic_assignment",
+         "description": "Strategy: select Disabled, normalized name, station call sign, or fuzzy name."},
+        {"id": "automatic_scope_help", "type": "info", "section": "automatic_assignment",
+         "description": "Path scope: enter a catalog-relative directory, or leave blank to search the entire catalog."},
+        {"id": "automatic_replace_help", "type": "info", "section": "automatic_assignment",
+         "description": "Replace existing logos: allow matching to replace a channel's effective logo. Manual mappings always take priority."},
+        *([{"id": "automatic_missing_groups", "type": "info", "section": "automatic_assignment",
+            "label": "Unavailable saved groups", "description": "These saved group IDs are not currently used by channels: " + ", ".join(sorted(unavailable_groups)) + ". They are not selectable or active."}] if unavailable_groups else []),
         {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
          "columns": [
              {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
@@ -94,14 +104,17 @@ def make_fields(data_dir, settings, channels, groups=()):
                  {"value": "callsign", "label": "Station call sign"},
                  {"value": "fuzzy", "label": "Fuzzy name"},
              ]},
-             {"id": "catalog", "label": "Catalog", "type": "select", "options": [
-                 {"value": catalog.id, "label": catalog.label} for catalog in catalogs.CATALOGS
-             ]},
+             # Restore the catalog column and selection logic when more catalogs are added.
+             # {"id": "catalog", "label": "Catalog", "type": "select", "options": [...]},
              {"id": "scope", "label": "Path scope", "type": "string"},
              {"id": "replace", "label": "Replace existing logos", "type": "boolean"},
-             {"id": "prefix", "label": "Name prefix to remove", "type": "string"},
-             {"id": "threshold", "label": "Fuzzy threshold (%)", "type": "number"},
          ]},
+        {"id": "automatic_prefix", "type": "string", "section": "automatic_assignment",
+         "label": "Name prefix to remove", "default": "",
+         "description": "Shared by all normalized-name and fuzzy-name groups. Removed only from the beginning of a channel name."},
+        {"id": "automatic_threshold", "type": "number", "section": "automatic_assignment",
+         "label": "Fuzzy threshold (%)", "default": 90,
+         "description": "Shared by all fuzzy-name groups. Scores must be strictly above this value; 100 cannot match."},
         {"id": "catalog_filters_section", "type": "section", "label": "Catalog filters", "collapsed": True},
         {"id": "catalog_filter_instructions", "type": "info", "section": "catalog_filters_section",
          "description": "Filters match full paths without regard to case. Include any matching path, then exclude matches. Save and reload the plugin to update choices. Saved mappings remain available."},

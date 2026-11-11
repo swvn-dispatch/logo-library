@@ -22,7 +22,7 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
                   and row.get("channel") not in (None, "")}
     catalog_by_id = {catalog.id: catalog for catalog in catalogs}
     group_ids = {str(group) for group in group_ids}
-    groups, errors = compile_groups(settings.get("automatic_groups", []), group_ids, catalog_by_id)
+    groups, errors = compile_groups(settings.get("automatic_groups", []), group_ids, catalog_by_id, settings)
     result = {"applied": 0, "skipped": 0, "failed": 0, "channels": [], "configuration_errors": errors}
     channels = list(channels)
     counts = Counter(str(channel["id"]) for channel in channels)

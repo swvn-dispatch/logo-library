@@ -27,16 +27,24 @@ logos do not depend on the plugin being enabled or on a catalog being reachable.
 - Keep mappings in the settings table after applying them.
 - Select logos from multiple catalogs in the same mapping table.
 - Update a logo catalog using its action.
-- Use **Apply changes** to refresh assigned copies after catalog updates.
+- Use **Manual Match** to refresh assigned copies after catalog updates.
 
 Automatic assignment runs only when explicitly requested. Under **Automatic
-assignment**, add and save a row for each group to enable, select a strategy,
-catalog and optional directory scope, then run **Run automatic matching**.
+assignment**, add and save a row for each group to enable, select a strategy
+and optional directory scope, then run **Auto Match**. Only groups
+used by channels are selectable, using their effective group assignments. The
+sole registered catalog is selected automatically; matching is disabled if
+multiple catalogs are registered until catalog selection is available.
 Groups without a valid enabled row are skipped. Saved manual mappings always
 take precedence, including incomplete mappings with a channel selected. By
 default, channels with an effective logo are skipped; select **Replace existing
 logos** for a group to allow replacement. Review the action result for skipped
 channels and failures. Catalog updates do not trigger matching.
+
+Name prefix removal and fuzzy threshold are shared strategy settings below the
+group table. They apply to every group using the relevant strategy. Older
+per-row prefix and threshold values are ignored; set the shared controls and
+save before running matching. The default fuzzy threshold is 90 percent.
 
 The normalized-name matcher uses Unicode normalization,
 case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
@@ -86,7 +94,7 @@ cause excessive backtracking, as they can stall the settings page.
 2. Once the initial catalog download completes, click **Reload plugin** and reopen its settings.
 3. Under **Manual assignment**, add a row and select a channel and logo path.
    The dropdown identifies each logo by catalog and catalog-relative path.
-4. Save the plugin settings, then run **Apply changes**. Review the action
+4. Save the plugin settings, then run **Manual Match**. Review the action
    result for skipped rows and errors.
 
 An explicit mapping replaces the channel's existing logo. Duplicate channel
@@ -97,7 +105,7 @@ plugin does not remove assigned copies.
 
 After updating a catalog, reload the plugin and reopen its settings
 before editing mappings. Catalog updates do not change assigned logos until you
-run **Apply changes** again. Image caches may delay visible changes.
+run **Manual Match** again. Image caches may delay visible changes.
 
 ### Current limitations
 
@@ -133,7 +141,7 @@ map its logos to channels within Dispatcharr. Refer to the upstream project's
 README for attribution and usage terms.
 
 The catalog is downloaded locally when the plugin is enabled. Use
-**Refresh TV Logos library** to refresh it. The current and previous snapshots are
+**Refresh tv-logos** to refresh it. The current and previous snapshots are
 retained, and updates need temporary space for the archive and extracted images.
 Logo choices come from a cached index rather than a filesystem scan at worker
 startup. Existing installations build a missing index in the background. Reload
