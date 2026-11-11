@@ -1,7 +1,7 @@
 {
   "name": "Logo Library",
   "version": "0.1.0",
-  "description": "Map logos from local external catalogs to Dispatcharr channels",
+  "description": "Assign channel logos from a catalog using manual mappings or group-based automatic matching.",
   "author": "sethwv",
   "license": "MIT",
   "manifest_version": 2,
