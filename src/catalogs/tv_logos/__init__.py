@@ -11,9 +11,10 @@ class TvLogosCatalog:
     accepts_legacy_paths = True
     actions = [{
         "id": "update_catalog",
-        "label": "Update TV Logos",
+        "label": "Refresh TV Logos library",
         "description": "Download the latest tv-logos catalog. Reload the plugin afterward.",
-        "button_label": "Update TV Logos",
+        "button_label": "Refresh TV Logos library",
+        "button_color": "teal",
         "async": True,
     }]
 

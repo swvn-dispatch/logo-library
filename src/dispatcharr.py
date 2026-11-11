@@ -72,7 +72,7 @@ def channel_options():
         F("effective_channel_number").asc(nulls_last=True), "effective_name", "id"
     )
     return [
-        {"value": str(channel.id), "label": f"{channel.effective_name} (#{channel.effective_channel_number}, ID {channel.id})"
-         if channel.effective_channel_number is not None else f"{channel.effective_name} (unnumbered, ID {channel.id})"}
+        {"value": str(channel.id), "label": f"{channel.effective_channel_number:.1f} - {channel.effective_name}"
+         if channel.effective_channel_number is not None else f"Unnumbered - {channel.effective_name}"}
         for channel in channels
     ]

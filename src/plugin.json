@@ -9,17 +9,18 @@
   "capabilities": ["background_tasks", "persistent_service", "outbound_network", "filesystem_write"],
   "actions": [
     {
-      "id": "update_catalog",
-      "label": "Update TV Logos",
-      "description": "Download the latest tv-logos catalog. Reload the plugin afterward.",
-      "button_label": "Update TV Logos",
-      "async": true
-    },
-    {
       "id": "apply_changes",
       "label": "Apply changes",
       "description": "Apply saved channel mappings and replace existing channel logos.",
       "button_label": "Apply changes",
+      "async": true
+    },
+    {
+      "id": "update_catalog",
+      "label": "Refresh TV Logos library",
+      "description": "Download the latest tv-logos catalog. Reload the plugin afterward.",
+      "button_label": "Refresh TV Logos library",
+      "button_color": "teal",
       "async": true
     }
   ],

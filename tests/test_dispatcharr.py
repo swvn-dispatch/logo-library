@@ -36,8 +36,9 @@ class DispatcharrTests(unittest.TestCase):
         expression.asc.assert_called_once_with(nulls_last=True)
         queryset.order_by.assert_called_once_with(order, "effective_name", "id")
         self.assertEqual([option["value"] for option in options], ["1", "2", "3"])
-        self.assertEqual(options[0]["label"], "First (#2.5, ID 1)")
-        self.assertEqual(options[2]["label"], "Third (unnumbered, ID 3)")
+        self.assertEqual(options[0]["label"], "2.5 - First")
+        self.assertEqual(options[1]["label"], "10.0 - Second")
+        self.assertEqual(options[2]["label"], "Unnumbered - Third")
 
     def test_assigns_normal_and_auto_created_channels(self):
         for auto_created in (False, True):

@@ -85,5 +85,5 @@ map its logos to channels within Dispatcharr. Refer to the upstream project's
 README for attribution and usage terms.
 
 The catalog is downloaded locally when the plugin is enabled. Use
-**Update TV Logos** to refresh it. The current and previous snapshots are
+**Refresh TV Logos library** to refresh it. The current and previous snapshots are
 retained, and updates need temporary space for the archive and extracted images.

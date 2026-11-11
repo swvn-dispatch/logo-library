@@ -15,6 +15,7 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(manifest["manifest_version"], 2)
         self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes"})
         self.assertTrue(all(action["async"] for action in manifest["actions"]))
+        self.assertEqual(manifest["actions"][0]["id"], "apply_changes")
         manifest_actions = {action["id"]: action for action in manifest["actions"]}
         declared = catalog_actions()
         self.assertEqual(len({action["id"] for action in declared}), len(declared))
@@ -22,6 +23,8 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(set(manifest_actions) - {"apply_changes"}, {action["id"] for action in declared})
         for action in declared:
             self.assertEqual(manifest_actions[action["id"]], action)
+        self.assertEqual(manifest_actions["update_catalog"]["button_color"], "teal")
+        self.assertEqual(manifest_actions["update_catalog"]["button_label"], "Refresh TV Logos library")
 
     def test_missing_selections_remain_options(self):
         with tempfile.TemporaryDirectory() as root:
