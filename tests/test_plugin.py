@@ -92,6 +92,20 @@ class PluginTests(unittest.TestCase):
         self.assertEqual([option["value"] for option in table["columns"][1]["options"]],
                          ["one:same.png", "two:same.png"])
 
+    def test_invalid_surrogate_option_does_not_hide_valid_logos(self):
+        class Catalog:
+            id = "example"
+            label = "Example"
+
+            def options(self, data_dir):
+                return ["valid.png", "bad-\udcc3.png"]
+
+        with tempfile.TemporaryDirectory() as root, patch("src.catalogs.CATALOGS", (Catalog(),)):
+            with self.assertLogs("src.fields", level="WARNING"):
+                fields = make_fields(root, {}, [])
+        table = next(field for field in fields if field["id"] == "mappings")
+        self.assertEqual(table["columns"][1]["options"], [{"value": "example:valid.png", "label": "Example / valid.png"}])
+
 
 if __name__ == "__main__":
     unittest.main()

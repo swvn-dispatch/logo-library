@@ -7,12 +7,26 @@ from . import catalogs
 logger = logging.getLogger(__name__)
 
 
+def _valid_text(value):
+    if not isinstance(value, str):
+        return False
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def make_fields(data_dir, settings, channels):
     logo_options = []
     for catalog in catalogs.CATALOGS:
         try:
-            logo_options.extend({"value": f"{catalog.id}:{path}", "label": f"{catalog.label} / {path}"}
-                                for path in catalog.options(data_dir))
+            for path in catalog.options(data_dir):
+                value, label = f"{catalog.id}:{path}", f"{catalog.label} / {path}"
+                if _valid_text(path) and _valid_text(value) and _valid_text(label):
+                    logo_options.append({"value": value, "label": label})
+                else:
+                    logger.warning("Skipping invalid logo option from catalog %s", catalog.id)
         except (OSError, ValueError):
             logger.warning("Could not list logos from catalog %s", catalog.id, exc_info=True)
         except Exception:
@@ -30,7 +44,7 @@ def make_fields(data_dir, settings, channels):
         if channel not in (None, "") and str(channel) not in channel_ids:
             channel_ids.add(str(channel))
             channel_options.append({"value": str(channel), "label": f"Missing channel (ID {channel})"})
-        if isinstance(logo, str) and logo and logo not in logo_ids:
+        if _valid_text(logo) and logo and logo not in logo_ids:
             logo_ids.add(logo)
             try:
                 catalog, path = catalogs.parse_logo(logo)

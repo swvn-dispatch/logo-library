@@ -59,17 +59,21 @@ def current_catalog(data_dir):
 
 
 def logo_paths(snapshot):
-    """List repository-relative PNG paths without following symlinks."""
+    """List UTF-8 repository paths without exposing filesystem surrogates."""
     if snapshot is None:
         return []
-    root = Path(snapshot)
+    root = os.fsencode(snapshot)
     result = []
     for base, dirs, files in os.walk(root, followlinks=False):
-        dirs[:] = [d for d in dirs if not (Path(base) / d).is_symlink()]
+        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(base, d))]
         for name in files:
-            path = Path(base) / name
-            if path.suffix.lower() == ".png" and path.is_file() and not path.is_symlink():
-                result.append(path.relative_to(root).as_posix())
+            path = os.path.join(base, name)
+            if not name.lower().endswith(b".png") or not os.path.isfile(path) or os.path.islink(path):
+                continue
+            try:
+                result.append(os.path.relpath(path, root).decode("utf-8"))
+            except UnicodeDecodeError:
+                logger.warning("Skipping catalog logo with a non-UTF-8 filename: %r", path)
     return sorted(result, key=str.casefold)
 
 
@@ -85,7 +89,11 @@ def resolve_logo(snapshot, relative):
     root = Path(snapshot)
     candidate = root
     for part in parts:
-        candidate = candidate / part
+        try:
+            filesystem_part = os.fsdecode(part.encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise CatalogError("Invalid logo path encoding") from exc
+        candidate = candidate / filesystem_part
         if candidate.is_symlink():
             raise CatalogError("Logo path contains a symlink")
     if not candidate.is_file():
@@ -137,7 +145,7 @@ def _extract(archive, destination):
             total += entry.file_size
             if entry.file_size > MAX_IMAGE_BYTES or total > MAX_EXTRACTED_BYTES:
                 raise CatalogError("Catalog images exceed the size limit")
-            target = destination.joinpath(*parts[1:])
+            target = destination.joinpath(*(os.fsdecode(part.encode("utf-8")) for part in parts[1:]))
             target.parent.mkdir(parents=True, exist_ok=True)
             with source.open(entry) as image, target.open("xb") as output:
                 shutil.copyfileobj(image, output, CHUNK_SIZE)

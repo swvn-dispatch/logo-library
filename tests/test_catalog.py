@@ -1,8 +1,10 @@
 import io
+import os
 from pathlib import Path
 import stat
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 from src.catalogs.tv_logos.catalog import CatalogError, current_catalog, logo_paths, resolve_logo, update_catalog
@@ -30,6 +32,27 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(logo_paths(snapshot), ["countries/nordic/a.png"])
             self.assertEqual(resolve_logo(snapshot, "countries/nordic/a.png").read_bytes(), b"image")
             self.assertIsNone(update_catalog(root, opener(b"invalid"), only_if_missing=True))
+
+    def test_utf8_paths_work_with_ascii_filesystem_decoding(self):
+        names = ["countries/école.png", "countries/новости.png"]
+        data = archive([("root/" + name, b"image") for name in names])
+
+        def ascii_fsdecode(path):
+            return path.decode("ascii", "surrogateescape") if isinstance(path, bytes) else os.fspath(path)
+
+        with tempfile.TemporaryDirectory() as root, patch("os.fsdecode", side_effect=ascii_fsdecode):
+            update_catalog(root, opener(data))
+            snapshot = current_catalog(root)
+            self.assertEqual(set(logo_paths(snapshot)), set(names))
+            for name in names:
+                self.assertEqual(resolve_logo(snapshot, name).read_bytes(), b"image")
+
+    def test_non_utf8_filename_is_skipped(self):
+        with tempfile.TemporaryDirectory() as root:
+            entries = [(os.fsencode(root), [], [b"invalid-\xff.png"])]
+            with patch("os.walk", return_value=entries), patch("os.path.isfile", return_value=True), \
+                 self.assertLogs("src.catalogs.tv_logos.catalog", level="WARNING"):
+                self.assertEqual(logo_paths(root), [])
 
     def test_failed_update_preserves_previous_snapshot(self):
         with tempfile.TemporaryDirectory() as root:
