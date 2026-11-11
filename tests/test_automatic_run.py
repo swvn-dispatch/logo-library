@@ -39,7 +39,7 @@ class AutomaticRunTests(unittest.TestCase):
         self.assertEqual(self.catalog.reads, 1)
         self.assertEqual(self.calls[0][4], "tv_logos:countries/united-states/abc-us.png")
 
-    def test_skips_manual_existing_missing_duplicate_and_no_match(self):
+    def test_skips_manual_existing_duplicate_and_no_match(self):
         self.settings["mappings"] = [{"channel": "1", "logo": ""}]
         result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"},
                                  {"id": 2, "group_id": 1, "name": "ABC", "logo_id": 8},
@@ -48,8 +48,9 @@ class AutomaticRunTests(unittest.TestCase):
                                  {"id": 5, "group_id": 1, "name": "ABC"},
                                  {"id": 5, "group_id": 1, "name": "ABC"}])
         self.assertEqual([entry["reason"] for entry in result["channels"]],
-                         ["manual_mapping", "existing_logo", "missing_group", "no_match",
+                         ["manual_mapping", "existing_logo", "no_match",
                           "duplicate_channel", "duplicate_channel"])
+        self.assertEqual(result["skipped"], 5)
         self.assertEqual(self.calls, [])
 
     def test_guard_skip_and_failure_are_isolated(self):
@@ -68,10 +69,23 @@ class AutomaticRunTests(unittest.TestCase):
         self.settings["automatic_groups"] *= 2
         result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
         self.assertEqual(len(result["configuration_errors"]), 2)
-        self.assertEqual(result["channels"][0]["reason"], "group_not_enabled")
+        self.assertEqual(result["channels"], [])
+        self.assertEqual(result["skipped"], 0)
         self.settings["mappings"] = None
         with self.assertRaises(ValueError):
             self.run_match([])
+
+    def test_disabled_unconfigured_and_missing_groups_are_omitted(self):
+        self.settings["automatic_groups"].append({"group": "2", "strategy": "disabled"})
+        self.settings["mappings"] = [{"channel": "3"}]
+        channels = [{"id": 1, "group_id": 1, "name": "ABC"},
+                    {"id": 2, "group_id": 2, "name": "ABC"},
+                    {"id": 3, "group_id": 3, "name": "ABC"},
+                    {"id": 4, "group_id": None, "name": "ABC"},
+                    {"id": 5, "group_id": 99, "name": "ABC"}]
+        result = run_automatic("/data", self.settings, channels, [1, 2, 3], [self.catalog], self.assign)
+        self.assertEqual((result["applied"], result["skipped"], result["failed"]), (1, 0, 0))
+        self.assertEqual([row["channel"] for row in result["channels"]], ["1"])
 
     def test_replace_policy_and_fuzzy_report(self):
         self.settings["automatic_groups"][0].update(strategy="fuzzy", replace=True)

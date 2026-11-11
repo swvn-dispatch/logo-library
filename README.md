@@ -39,7 +39,9 @@ Groups without a valid enabled row are skipped. Saved manual mappings always
 take precedence, including incomplete mappings with a channel selected. By
 default, channels with an effective logo are skipped; select **Replace existing
 logos** for a group to allow replacement. Review the action result for skipped
-channels and failures. Catalog updates do not trigger matching.
+channels and failures. Channels outside enabled group configurations are
+omitted from the results and skip counts. Invalid group configurations are
+still reported. Catalog updates do not trigger matching.
 
 Name prefix removal and fuzzy threshold are shared strategy settings below the
 group table. They apply to every group using the relevant strategy. Older

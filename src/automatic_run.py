@@ -30,17 +30,15 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
     for channel in channels:
         channel_id = str(channel["id"])
         group_id = str(channel["group_id"]) if channel.get("group_id") is not None else None
+        config = groups.get(group_id)
+        if config is None:
+            continue
         detail = {"channel": channel_id, "name": channel.get("name", ""), "group": group_id}
         try:
-            config = groups.get(group_id)
             if counts[channel_id] > 1:
                 reason = "duplicate_channel"
             elif channel_id in manual_ids:
                 reason = "manual_mapping"
-            elif group_id is None or group_id not in group_ids:
-                reason = "missing_group"
-            elif config is None:
-                reason = "group_not_enabled"
             elif channel.get("logo_id") is not None and not config["replace"]:
                 reason = "existing_logo"
             else:
