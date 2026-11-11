@@ -64,9 +64,15 @@ def get_plugin_state(code_dir):
 
 
 def channel_options():
+    from django.db.models import F
+    from apps.channels.managers import with_effective_values
     from apps.channels.models import Channel
 
+    channels = with_effective_values(Channel.objects.all()).order_by(
+        F("effective_channel_number").asc(nulls_last=True), "effective_name", "id"
+    )
     return [
-        {"value": str(channel.id), "label": f"{channel.name} (#{channel.channel_number}, ID {channel.id})"}
-        for channel in Channel.objects.all().order_by("name", "id")
+        {"value": str(channel.id), "label": f"{channel.effective_name} (#{channel.effective_channel_number}, ID {channel.id})"
+         if channel.effective_channel_number is not None else f"{channel.effective_name} (unnumbered, ID {channel.id})"}
+        for channel in channels
     ]
