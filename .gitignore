@@ -1,0 +1,9 @@
+# Beads and local agent tooling are not part of the repository.
+.beads/
+.beads.gate.lock*
+.agents/
+.codex/
+.dolt/
+.beads-credential-key
+AGENTS.md
+CLAUDE.md
