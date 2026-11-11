@@ -47,6 +47,13 @@ paths further. Multiple call signs or matching logo variants are skipped. This
 heuristic does not verify station identity and does not support Canadian call
 signs or guide metadata yet.
 
+The in-development fuzzy matcher scores normalized names with Python's
+`SequenceMatcher` ratio, expressed as a percentage. A match must score strictly
+above the configured threshold, so a threshold of 100 cannot match anything.
+Digit sequences and the presence of `plus` must agree. Exact top-score ties
+are skipped; a close second score does not prevent a unique winner. The score
+is a similarity measure, not a probability that an assignment is correct.
+
 ## Catalog filters
 
 Use the collapsed **Catalog filters** section to narrow the logo choices in the
