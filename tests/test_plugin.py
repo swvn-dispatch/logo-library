@@ -40,7 +40,8 @@ class PluginTests(unittest.TestCase):
             fields = make_fields(root, {}, [])
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
-            "automatic_assignment", "automatic_coming_soon",
+            "automatic_assignment", "automatic_coming_soon", "catalog_filters_section",
+            "catalog_filter_instructions", "catalog_filters",
         ])
         by_id = {field["id"]: field for field in fields}
         self.assertNotIn("section", by_id["instructions"])
@@ -50,6 +51,33 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_coming_soon"]["section"], "automatic_assignment")
         self.assertIn("coming soon", by_id["automatic_coming_soon"]["description"])
+        self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
+        self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
+        self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
+        self.assertEqual(len(by_id["catalog_filters"]["columns"][0]["options"]), 8)
+
+    def test_filters_keep_saved_logo_and_report_invalid_regex(self):
+        class Catalog:
+            id = "example"
+            label = "Example"
+            accepts_legacy_paths = True
+
+            def options(self, data_dir):
+                return ["countries/canada/a.png", "countries/us/b.png", "countries/france/c.png"]
+
+        settings = {
+            "catalog_filters": [{"mode": "include_contains", "text": "CANADA"},
+                                {"mode": "exclude_regex", "text": "["}],
+            "mappings": [{"channel": "1", "logo": "example:countries/us/b.png"}],
+        }
+        with tempfile.TemporaryDirectory() as root, patch("src.catalogs.CATALOGS", (Catalog(),)):
+            fields = make_fields(root, settings, [])
+        by_id = {field["id"]: field for field in fields}
+        options = by_id["mappings"]["columns"][1]["options"]
+        self.assertEqual([item["value"] for item in options],
+                         ["example:countries/canada/a.png", "example:countries/us/b.png"])
+        self.assertEqual(options[1]["label"], "Example / countries/us/b.png")
+        self.assertIn("Row 2", by_id["catalog_filter_errors"]["description"])
 
     def test_leader_initial_download_is_queued_only_when_missing(self):
         plugin = Plugin()

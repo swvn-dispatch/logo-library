@@ -31,6 +31,24 @@ logos do not depend on the plugin being enabled or on a catalog being reachable.
 
 Automatic assignment is planned but is not implemented.
 
+## Catalog filters
+
+Use the collapsed **Catalog filters** section to narrow the logo choices in the
+mapping table. Filters currently apply to TV Logos. Each row selects an include
+or exclude mode and text to match against the full catalog-relative path.
+Contains, starts with, exact, and regex modes are case-insensitive. For example,
+an **Include contains** row with `canada` shows matching paths.
+
+When there are include rows, a path must match at least one of them. Any matching
+exclude row removes it from the choices. Without include rows, all paths are
+included before exclusions. Existing mapped logos remain selectable even when
+filtered out. Save the settings, reload the plugin, and reopen its settings to
+refresh the choices.
+
+Regex uses Python's regular expression syntax. Invalid or incomplete rows are
+ignored and reported in the filter section after reload. Avoid expressions that
+cause excessive backtracking, as they can stall the settings page.
+
 ## Manual assignment
 
 1. Enable Logo Library and approve its requested capabilities. The initial
