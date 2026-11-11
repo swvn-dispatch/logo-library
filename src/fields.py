@@ -67,11 +67,11 @@ def make_fields(data_dir, settings, channels, groups=()):
     group_options = list(groups)
     group_ids = {option["value"] for option in group_options}
     group_rows = settings.get("automatic_groups", [])
-    scope_options = [{"value": "", "label": "Entire catalog"}] + [
+    scope_options = [{"value": ".", "label": "Entire catalog"}] + [
         {"value": path, "label": path} for path in sorted(directories, key=str.casefold)
     ]
     saved_scopes = {row.get("scope") for row in group_rows if isinstance(row, dict)
-                    and isinstance(row.get("scope"), str) and row.get("scope")} if isinstance(group_rows, list) else set()
+                    and isinstance(row.get("scope"), str) and row.get("scope") not in ("", ".")} if isinstance(group_rows, list) else set()
     scope_options.extend({"value": path, "label": f"Unavailable: {path}"}
                          for path in sorted(saved_scopes - directories))
     unavailable_groups = set()

@@ -13,6 +13,13 @@ class AutomaticGroupTests(unittest.TestCase):
         self.assertTrue(groups["1"]["replace"])
         self.assertNotIn("2", groups)
 
+    def test_catalog_root_scope_accepts_new_and_legacy_values(self):
+        for scope in ("", ".", None):
+            with self.subTest(scope=scope):
+                groups, errors = compile_groups([{"group": "1", "strategy": "exact", "scope": scope}], [1], {"tv"})
+                self.assertEqual(errors, [])
+                self.assertEqual(groups["1"]["scope"], "")
+
     def test_duplicates_and_missing_groups_are_rejected(self):
         row = {"group": "1", "strategy": "exact", "catalog": "tv"}
         groups, errors = compile_groups([row, row, {"group": "9"}], [1], {"tv"})

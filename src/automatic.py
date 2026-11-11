@@ -73,7 +73,7 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
             if strategy == "fuzzy" and (isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not 0 <= threshold <= 100):
                 raise ValueError("Fuzzy threshold must be between 0 and 100")
             compiled[group] = {"strategy": strategy, "catalog": catalog_id,
-                               "scope": "" if not scope else str(path), "replace": bool(replace),
+                               "scope": "" if str(path) == "." else str(path), "replace": bool(replace),
                                "prefix": prefix, "prefix_mode": prefix_mode,
                                "variant": variant, "threshold": threshold}
         except ValueError as exc:

@@ -87,8 +87,19 @@ class PluginTests(unittest.TestCase):
         table = next(field for field in fields if field["id"] == "automatic_groups")
         scope = next(column for column in table["columns"] if column["id"] == "scope")
         self.assertEqual(scope["type"], "select")
+        self.assertIn({"value": ".", "label": "Entire catalog"}, scope["options"])
         self.assertIn({"value": "countries/us/local", "label": "countries/us/local"}, scope["options"])
         self.assertIn({"value": "us", "label": "Unavailable: us"}, scope["options"])
+
+    def test_field_select_options_have_nonempty_values(self):
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, {}, [])
+        for field in fields:
+            for item in [field, *field.get("columns", [])]:
+                for option in item.get("options", []):
+                    with self.subTest(field=field["id"], option=option):
+                        self.assertIsInstance(option["value"], str)
+                        self.assertTrue(option["value"])
 
     def test_filters_keep_saved_logo_and_report_invalid_regex(self):
         class Catalog:
