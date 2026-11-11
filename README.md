@@ -37,30 +37,40 @@ sole registered catalog is selected automatically; matching is disabled if
 multiple catalogs are registered until catalog selection is available.
 Groups without a valid enabled row are skipped. Saved manual mappings always
 take precedence, including incomplete mappings with a channel selected. By
-default, channels with an effective logo are skipped; select **Replace existing
-logos** for a group to allow replacement. Review the action result for skipped
+default, channels with an effective logo are skipped; select **Replace** for a
+group to allow replacement. Review the action result for skipped
 channels and failures. Channels outside enabled group configurations are
 omitted from the results and skip counts. Invalid group configurations are
 still reported. Catalog updates do not trigger matching.
 
-Name prefix removal and fuzzy threshold are shared strategy settings below the
-group table. They apply to every group using the relevant strategy. Older
-per-row prefix and threshold values are ignored; set the shared controls and
-save before running matching. The default fuzzy threshold is 90 percent.
+The directory selector lists paths from the catalog index. A saved path that is
+no longer available remains visible, but an empty scope produces a configuration
+error rather than a series of misleading `no_match` results. Leave the scope
+blank to search the entire catalog.
+
+The default name prefix and fuzzy threshold are shared settings below the group
+table. Add a group-specific prefix rule to override the default for a group.
+Rules may be literal or Python regex; regex is matched only at the beginning of
+the channel name. Avoid expressions with excessive backtracking, which can stall
+the matching task. Invalid regex and duplicate group rules disable that group.
+Older prefix and threshold values in the main group table are ignored. The
+default fuzzy threshold is 90 percent.
 
 The normalized-name matcher uses Unicode normalization,
 case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
 It preserves digits and does not transliterate or equate spelled-out numbers
-with digits. An optional literal channel-name prefix is removed first. For TV
+with digits. An optional literal or regex channel-name prefix is removed first. For TV
 Logos, recognized country suffixes are stripped only in their corresponding
 country directories; `hd`, `hz`, and `horizontal` filename suffixes are treated
-as variants. Multiple matching paths are ambiguous and are not selected. Other
+as variants. Multiple matching paths are ambiguous by default. The optional
+**Prefer standard variant** setting selects a single unmarked path only if all
+candidates share a recognized HD or horizontal variant family. Other
 country suffixes remain part of the name until explicitly supported.
 
 The call-sign matcher only considers uppercase US-style `K` or
 `W` call signs in channel names and station-specific TV Logos paths under
 `countries/united-states/us-local`. The configured directory scope narrows those
-paths further. Multiple call signs or matching logo variants are skipped. This
+paths further. Multiple call signs or unresolved logo variants are skipped. This
 heuristic does not verify station identity and does not support Canadian call
 signs or guide metadata yet.
 
@@ -68,7 +78,8 @@ The fuzzy matcher scores normalized names with Python's
 `SequenceMatcher` ratio, expressed as a percentage. A match must score strictly
 above the configured threshold, so a threshold of 100 cannot match anything.
 Digit sequences and the presence of `plus` must agree. Exact top-score ties
-are skipped; a close second score does not prevent a unique winner. The score
+are skipped unless the standard-variant preference resolves a recognized variant
+family; a close second score does not prevent a unique winner. The score
 is a similarity measure, not a probability that an assignment is correct.
 
 ## Catalog filters

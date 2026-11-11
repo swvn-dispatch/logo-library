@@ -45,3 +45,21 @@ class AutomaticGroupTests(unittest.TestCase):
         groups, errors = compile_groups(rows, [1, 2], {"tv", "other"})
         self.assertEqual(groups, {})
         self.assertEqual(len(errors), 2)
+
+    def test_group_prefix_rules_override_default_and_validate(self):
+        rows = [{"group": "1", "strategy": "exact"}, {"group": "2", "strategy": "exact"}]
+        settings = {"automatic_prefix": "default", "automatic_prefix_rules": [
+            {"group": "1", "mode": "regex", "prefix": r"^(US|CA)\s*\|\s*"}]}
+        groups, errors = compile_groups(rows, [1, 2], {"tv"}, settings)
+        self.assertEqual(errors, [])
+        self.assertEqual(groups["1"]["prefix_mode"], "regex")
+        self.assertEqual(groups["2"]["prefix"], "default")
+        settings["automatic_prefix_rules"].append({"group": "1", "mode": "literal", "prefix": "X"})
+        groups, errors = compile_groups(rows, [1, 2], {"tv"}, settings)
+        self.assertNotIn("1", groups)
+        self.assertIn("2", groups)
+        self.assertIn("more than one", errors[0])
+        settings["automatic_prefix_rules"] = [{"group": "1", "mode": "regex", "prefix": "["}]
+        groups, errors = compile_groups(rows, [1, 2], {"tv"}, settings)
+        self.assertNotIn("1", groups)
+        self.assertIn("Invalid prefix regex", errors[0])

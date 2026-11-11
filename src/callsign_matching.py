@@ -4,6 +4,7 @@ from collections import defaultdict
 import re
 
 from .catalog_scope import scoped_paths
+from .variants import select_variant
 
 # Only station-looking, uppercase channel tokens are extracted. A call sign
 # alone does not establish station identity outside station-specific paths.
@@ -29,7 +30,7 @@ def build_callsign_index(paths, catalog_id, scope=""):
     return {token: tuple(sorted(values)) for token, values in index.items()}
 
 
-def match_callsign(channel_name, index):
+def match_callsign(channel_name, index, variant="strict", catalog_id=None):
     """Match one uppercase call sign, or return a reason to skip the channel."""
     tokens = set(_CHANNEL_CALLSIGN.findall(channel_name))
     if not tokens:
@@ -39,6 +40,7 @@ def match_callsign(channel_name, index):
     candidates = index.get(tokens.pop(), ())
     if not candidates:
         return {"path": None, "reason": "no_match"}
-    if len(candidates) != 1:
+    selected = select_variant(candidates, variant, catalog_id)
+    if selected is None:
         return {"path": None, "reason": "ambiguous"}
-    return {"path": candidates[0], "reason": None}
+    return {"path": selected, "reason": None}

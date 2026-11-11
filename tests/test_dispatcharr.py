@@ -23,7 +23,7 @@ class DispatcharrTests(unittest.TestCase):
     def test_guard_rechecks_current_settings_and_effective_values(self):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
         expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
-                    "prefix": "", "threshold": 90}
+                    "prefix": "", "prefix_mode": "literal", "variant": "strict", "threshold": 90}
         plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
         plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
         channel = types.SimpleNamespace(channel_group_id=8, name="Raw", logo_id=None)
@@ -62,6 +62,9 @@ class DispatcharrTests(unittest.TestCase):
             settings["automatic_prefix"] = "US:"
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("automatic_prefix")
+            settings["automatic_variant"] = "standard"
+            self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+            settings.pop("automatic_variant")
             settings["automatic_groups"].append(dict(settings["automatic_groups"][0]))
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings["automatic_groups"].pop()

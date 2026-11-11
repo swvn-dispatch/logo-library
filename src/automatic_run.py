@@ -4,6 +4,7 @@ from collections import Counter
 
 from .automatic import compile_groups
 from .callsign_matching import build_callsign_index, match_callsign
+from .catalog_scope import scoped_paths
 from .fuzzy_matching import match_fuzzy
 from .name_matching import build_name_index, match_name
 
@@ -23,6 +24,18 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
     catalog_by_id = {catalog.id: catalog for catalog in catalogs}
     group_ids = {str(group) for group in group_ids}
     groups, errors = compile_groups(settings.get("automatic_groups", []), group_ids, catalog_by_id, settings)
+    catalog_paths = {}
+    for group_id, config in list(groups.items()):
+        try:
+            catalog = catalog_by_id[config["catalog"]]
+            if catalog.id not in catalog_paths:
+                catalog_paths[catalog.id] = list(catalog.options(data_dir))
+            if not any(scoped_paths(catalog_paths[catalog.id], config["scope"])):
+                errors.append(f"Group {group_id}: path scope contains no indexed logos; check the catalog-relative directory and catalog index")
+                del groups[group_id]
+        except Exception as exc:
+            errors.append(f"Group {group_id}: could not read catalog: {exc}")
+            del groups[group_id]
     result = {"applied": 0, "skipped": 0, "failed": 0, "channels": [], "configuration_errors": errors}
     channels = list(channels)
     counts = Counter(str(channel["id"]) for channel in channels)
@@ -45,16 +58,18 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
                 catalog = catalog_by_id[config["catalog"]]
                 key = (catalog.id, config["scope"], config["strategy"] == "callsign")
                 if key not in indices:
-                    paths = catalog.options(data_dir)
+                    paths = catalog_paths[catalog.id]
                     indices[key] = (build_callsign_index(paths, catalog.id, config["scope"]) if key[2]
                                     else build_name_index(paths, catalog.id, config["scope"]))
                 index = indices[key]
                 if config["strategy"] == "callsign":
-                    match = match_callsign(channel["name"], index)
+                    match = match_callsign(channel["name"], index, config["variant"], catalog.id)
                 elif config["strategy"] == "fuzzy":
-                    match = match_fuzzy(channel["name"], index, config["threshold"], config["prefix"])
+                    match = match_fuzzy(channel["name"], index, config["threshold"], config["prefix"],
+                                        config["prefix_mode"], config["variant"], catalog.id)
                 else:
-                    match = match_name(channel["name"], index, config["prefix"])
+                    match = match_name(channel["name"], index, config["prefix"], config["prefix_mode"],
+                                       config["variant"], catalog.id)
                 if match.get("score") is not None:
                     detail["score"] = match["score"]
                 reason = match["reason"]

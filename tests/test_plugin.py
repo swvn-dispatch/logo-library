@@ -47,7 +47,7 @@ class PluginTests(unittest.TestCase):
             "instructions", "manual_assignment", "manual_instructions", "mappings",
             "automatic_assignment", "automatic_coming_soon", "automatic_group_help", "automatic_strategy_help",
             "automatic_scope_help", "automatic_replace_help", "automatic_groups", "automatic_prefix",
-            "automatic_threshold", "catalog_filters_section",
+            "automatic_prefix_rules", "automatic_prefix_help", "automatic_threshold", "automatic_variant", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
         ])
         by_id = {field["id"]: field for field in fields}
@@ -61,6 +61,8 @@ class PluginTests(unittest.TestCase):
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
                          ["group", "strategy", "scope", "replace"])
         self.assertEqual(by_id["automatic_threshold"]["default"], 90)
+        self.assertEqual(by_id["automatic_groups"]["columns"][-1]["label"], "Replace")
+        self.assertEqual(by_id["automatic_variant"]["default"], "strict")
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
         self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
         self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
@@ -74,6 +76,19 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(table["columns"][0]["options"], [{"value": "1", "label": "Renamed"}])
         notice = next(field for field in fields if field["id"] == "automatic_missing_groups")
         self.assertIn("9", notice["description"])
+
+    def test_scope_options_use_indexed_directories_and_keep_missing_values(self):
+        class Catalog:
+            id = label = "example"
+            def options(self, data_dir):
+                return ["countries/us/abc.png", "countries/us/local/station.png"]
+        with tempfile.TemporaryDirectory() as root, patch("src.catalogs.CATALOGS", (Catalog(),)):
+            fields = make_fields(root, {"automatic_groups": [{"scope": "us"}]}, [], [])
+        table = next(field for field in fields if field["id"] == "automatic_groups")
+        scope = next(column for column in table["columns"] if column["id"] == "scope")
+        self.assertEqual(scope["type"], "select")
+        self.assertIn({"value": "countries/us/local", "label": "countries/us/local"}, scope["options"])
+        self.assertIn({"value": "us", "label": "Unavailable: us"}, scope["options"])
 
     def test_filters_keep_saved_logo_and_report_invalid_regex(self):
         class Catalog:

@@ -10,6 +10,13 @@ class CallSignTests(unittest.TestCase):
         self.assertEqual(match_callsign("ABC 7 (WABC-TV)", index)["path"], path)
         self.assertEqual(match_callsign("ABC 7 (wabc)", index)["reason"], "no_callsign")
 
+    def test_callsigns_work_in_different_name_formats(self):
+        path = "countries/united-states/us-local/abc-7-wabc-us.png"
+        index = build_callsign_index([path], "tv_logos")
+        for name in ("US | ABC New York | WABC", "WABC-TV New York", "ABC 7 (WABC)", "New York: WABC"):
+            with self.subTest(name=name):
+                self.assertEqual(match_callsign(name, index)["path"], path)
+
     def test_only_complete_tokens_are_matched(self):
         path = "countries/united-states/us-local/abc-7-wabco-us.png"
         index = build_callsign_index([path], "tv_logos")

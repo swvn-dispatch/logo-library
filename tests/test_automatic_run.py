@@ -93,3 +93,16 @@ class AutomaticRunTests(unittest.TestCase):
         result = self.run_match([{"id": 1, "group_id": 1, "name": "ABCD", "logo_id": 2}])
         self.assertEqual(result["channels"][0]["reason"], "below_threshold")
         self.assertLess(result["channels"][0]["score"], 99)
+
+    def test_missing_scope_is_a_configuration_error(self):
+        self.settings["automatic_groups"][0]["scope"] = "united-states"
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertIn("scope contains no indexed logos", result["configuration_errors"][0])
+        self.assertEqual(result["channels"], [])
+        self.assertEqual(self.calls, [])
+
+    def test_group_regex_prefix_is_used_end_to_end(self):
+        self.settings["automatic_prefix_rules"] = [{"group": "1", "mode": "regex", "prefix": r"^(?:US|CA)\s*\|\s*"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "CA | ABC"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(self.calls[0][3]["prefix_mode"], "regex")

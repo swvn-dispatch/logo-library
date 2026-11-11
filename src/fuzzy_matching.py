@@ -4,6 +4,7 @@ from difflib import SequenceMatcher
 import re
 
 from .name_matching import normalize_name
+from .variants import select_variant
 
 
 def _compatible(left, right):
@@ -12,7 +13,7 @@ def _compatible(left, right):
             and ("plus" in left) == ("plus" in right))
 
 
-def match_fuzzy(channel_name, index, threshold, prefix=""):
+def match_fuzzy(channel_name, index, threshold, prefix="", prefix_mode="literal", variant="strict", catalog_id=None):
     """Return the unique best path strictly above a similarity percentage.
 
     Scores are SequenceMatcher ratios on normalized names, multiplied by 100.
@@ -22,7 +23,7 @@ def match_fuzzy(channel_name, index, threshold, prefix=""):
     if (isinstance(threshold, bool) or not isinstance(threshold, (int, float))
             or not 0 <= threshold <= 100):
         raise ValueError("Fuzzy threshold must be between 0 and 100")
-    name = normalize_name(channel_name, prefix)
+    name = normalize_name(channel_name, prefix, prefix_mode)
     if not name:
         return {"path": None, "reason": "no_match", "score": None}
     best_score = None
@@ -40,6 +41,7 @@ def match_fuzzy(channel_name, index, threshold, prefix=""):
         return {"path": None, "reason": "no_match", "score": None}
     if best_score <= threshold:
         return {"path": None, "reason": "below_threshold", "score": best_score}
-    if len(best_paths) != 1:
+    selected = select_variant(best_paths, variant, catalog_id)
+    if selected is None:
         return {"path": None, "reason": "ambiguous", "score": best_score}
-    return {"path": next(iter(best_paths)), "reason": None, "score": best_score}
+    return {"path": selected, "reason": None, "score": best_score}

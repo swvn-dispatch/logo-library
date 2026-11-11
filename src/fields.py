@@ -1,6 +1,7 @@
 """Build native Dispatcharr settings fields from the current catalog."""
 
 import logging
+from pathlib import PurePosixPath
 
 from . import catalogs
 from .filters import MATCH_TYPES, compile_filters, matches
@@ -24,12 +25,15 @@ def make_fields(data_dir, settings, channels, groups=()):
     rules, filter_errors = compile_filters(settings.get("catalog_filters", []), default_catalog)
     logo_options = []
     all_logos = {}
+    directories = set()
     for catalog in catalogs.CATALOGS:
         try:
             for path in catalog.options(data_dir):
                 value, label = f"{catalog.id}:{path}", f"{catalog.label} / {path}"
                 if _valid_text(path) and _valid_text(value) and _valid_text(label):
                     all_logos[value] = label
+                    if len(catalogs.CATALOGS) == 1:
+                        directories.update(str(parent) for parent in PurePosixPath(path).parents if str(parent) != ".")
                     if matches(path, rules.get(catalog.id, [])):
                         logo_options.append({"value": value, "label": label})
                 else:
@@ -63,6 +67,13 @@ def make_fields(data_dir, settings, channels, groups=()):
     group_options = list(groups)
     group_ids = {option["value"] for option in group_options}
     group_rows = settings.get("automatic_groups", [])
+    scope_options = [{"value": "", "label": "Entire catalog"}] + [
+        {"value": path, "label": path} for path in sorted(directories, key=str.casefold)
+    ]
+    saved_scopes = {row.get("scope") for row in group_rows if isinstance(row, dict)
+                    and isinstance(row.get("scope"), str) and row.get("scope")} if isinstance(group_rows, list) else set()
+    scope_options.extend({"value": path, "label": f"Unavailable: {path}"}
+                         for path in sorted(saved_scopes - directories))
     unavailable_groups = set()
     if isinstance(group_rows, list):
         for row in group_rows:
@@ -90,9 +101,9 @@ def make_fields(data_dir, settings, channels, groups=()):
         {"id": "automatic_strategy_help", "type": "info", "section": "automatic_assignment",
          "description": "Strategy: select Disabled, normalized name, station call sign, or fuzzy name."},
         {"id": "automatic_scope_help", "type": "info", "section": "automatic_assignment",
-         "description": "Path scope: enter a catalog-relative directory, or leave blank to search the entire catalog."},
+         "description": "Path scope: select a catalog directory, or leave blank to search the entire catalog. Unavailable saved paths cannot be matched."},
         {"id": "automatic_replace_help", "type": "info", "section": "automatic_assignment",
-         "description": "Replace existing logos: allow matching to replace a channel's effective logo. Manual mappings always take priority."},
+         "description": "Replace: allow matching to replace a channel's effective logo. Manual mappings always take priority."},
         *([{"id": "automatic_missing_groups", "type": "info", "section": "automatic_assignment",
             "label": "Unavailable saved groups", "description": "These saved group IDs are not currently used by channels: " + ", ".join(sorted(unavailable_groups)) + ". They are not selectable or active."}] if unavailable_groups else []),
         {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
@@ -106,15 +117,29 @@ def make_fields(data_dir, settings, channels, groups=()):
              ]},
              # Restore the catalog column and selection logic when more catalogs are added.
              # {"id": "catalog", "label": "Catalog", "type": "select", "options": [...]},
-             {"id": "scope", "label": "Path scope", "type": "string"},
-             {"id": "replace", "label": "Replace existing logos", "type": "boolean"},
+             {"id": "scope", "label": "Path scope", "type": "select", "options": scope_options},
+             {"id": "replace", "label": "Replace", "type": "boolean"},
          ]},
         {"id": "automatic_prefix", "type": "string", "section": "automatic_assignment",
          "label": "Name prefix to remove", "default": "",
-         "description": "Shared by all normalized-name and fuzzy-name groups. Removed only from the beginning of a channel name."},
+         "description": "Default literal prefix for name strategies. A group-specific rule below overrides it."},
+        {"id": "automatic_prefix_rules", "type": "table", "section": "automatic_assignment",
+         "label": "Group-specific name prefixes", "default": [], "columns": [
+             {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
+             {"id": "mode", "label": "Mode", "type": "select", "options": [
+                 {"value": "literal", "label": "Literal"}, {"value": "regex", "label": "Regex"}]},
+             {"id": "prefix", "label": "Prefix", "type": "string"},
+         ]},
+        {"id": "automatic_prefix_help", "type": "info", "section": "automatic_assignment",
+         "description": "Group rules override the default prefix for name strategies. Regex uses Python syntax and only matches at the start. Avoid patterns with excessive backtracking. Duplicate rules disable matching for that group."},
         {"id": "automatic_threshold", "type": "number", "section": "automatic_assignment",
          "label": "Fuzzy threshold (%)", "default": 90,
          "description": "Shared by all fuzzy-name groups. Scores must be strictly above this value; 100 cannot match."},
+        {"id": "automatic_variant", "type": "select", "section": "automatic_assignment",
+         "label": "Logo variant preference", "default": "strict", "options": [
+             {"value": "strict", "label": "Skip ambiguous variants"},
+             {"value": "standard", "label": "Prefer standard variant"}],
+         "description": "Prefer standard selects an unmarked logo only when all candidates belong to the same recognized HD or horizontal variant family; other ties are skipped."},
         {"id": "catalog_filters_section", "type": "section", "label": "Catalog filters", "collapsed": True},
         {"id": "catalog_filter_instructions", "type": "info", "section": "catalog_filters_section",
          "description": "Filters match full paths without regard to case. Include any matching path, then exclude matches. Save and reload the plugin to update choices. Saved mappings remain available."},

@@ -2,8 +2,10 @@
 
 from collections import defaultdict
 import unicodedata
+import re
 
 from .catalog_scope import scoped_paths
+from .variants import select_variant
 
 # TV Logos uses these country suffixes in the corresponding directories.
 # Do not strip an unrecognized suffix: it may be part of a network name.
@@ -14,16 +16,23 @@ _COUNTRY_SUFFIXES = {
 _VARIANTS = {"hd", "hz", "horizontal"}
 
 
-def normalize_name(value, prefix=""):
+def normalize_name(value, prefix="", prefix_mode="literal"):
     """Normalize case and punctuation while retaining digits and plus signs.
 
     The optional prefix is removed only at the beginning, before punctuation
     normalization. Unicode is normalized but not transliterated.
     """
-    value = unicodedata.normalize("NFKC", value).casefold().strip()
-    prefix = unicodedata.normalize("NFKC", prefix).casefold().strip()
-    if prefix and value.startswith(prefix):
-        value = value[len(prefix):]
+    value = unicodedata.normalize("NFKC", value).strip()
+    if prefix and prefix_mode == "regex":
+        match = re.match(prefix, value, re.IGNORECASE)
+        if match:
+            value = value[match.end():]
+    else:
+        value = value.casefold()
+        prefix = unicodedata.normalize("NFKC", prefix).casefold().strip()
+        if prefix and value.startswith(prefix):
+            value = value[len(prefix):]
+    value = value.casefold()
     value = value.replace("&", "and").replace("+", "plus")
     return "".join(char for char in value if char.isalnum())
 
@@ -57,12 +66,13 @@ def build_name_index(paths, catalog_id, scope=""):
     return {name: tuple(sorted(values)) for name, values in index.items()}
 
 
-def match_name(channel_name, index, prefix=""):
+def match_name(channel_name, index, prefix="", prefix_mode="literal", variant="strict", catalog_id=None):
     """Return a unique path or a reason suitable for reporting a skip."""
-    key = normalize_name(channel_name, prefix)
+    key = normalize_name(channel_name, prefix, prefix_mode)
     candidates = index.get(key, ()) if key else ()
     if not candidates:
         return {"path": None, "reason": "no_match"}
-    if len(candidates) != 1:
+    selected = select_variant(candidates, variant, catalog_id)
+    if selected is None:
         return {"path": None, "reason": "ambiguous"}
-    return {"path": candidates[0], "reason": None}
+    return {"path": selected, "reason": None}
