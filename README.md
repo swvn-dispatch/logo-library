@@ -31,6 +31,15 @@ logos do not depend on the plugin being enabled or on a catalog being reachable.
 
 Automatic assignment is planned but is not implemented.
 
+The in-development normalized-name matcher uses Unicode normalization,
+case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
+It preserves digits and does not transliterate or equate spelled-out numbers
+with digits. An optional literal channel-name prefix is removed first. For TV
+Logos, recognized country suffixes are stripped only in their corresponding
+country directories; `hd`, `hz`, and `horizontal` filename suffixes are treated
+as variants. Multiple matching paths are ambiguous and are not selected. Other
+country suffixes remain part of the name until explicitly supported.
+
 ## Catalog filters
 
 Use the collapsed **Catalog filters** section to narrow the logo choices in the
