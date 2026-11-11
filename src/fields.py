@@ -18,7 +18,7 @@ def _valid_text(value):
     return True
 
 
-def make_fields(data_dir, settings, channels):
+def make_fields(data_dir, settings, channels, groups=()):
     legacy_catalogs = [catalog.id for catalog in catalogs.CATALOGS if getattr(catalog, "accepts_legacy_paths", False)]
     default_catalog = legacy_catalogs[0] if len(legacy_catalogs) == 1 else None
     rules, filter_errors = compile_filters(settings.get("catalog_filters", []), default_catalog)
@@ -60,6 +60,17 @@ def make_fields(data_dir, settings, channels):
             except ValueError:
                 label = f"Missing: {logo}"
             logo_options.append({"value": logo, "label": label})
+    group_options = list(groups)
+    group_ids = {option["value"] for option in group_options}
+    group_rows = settings.get("automatic_groups", [])
+    if isinstance(group_rows, list):
+        for row in group_rows:
+            if not isinstance(row, dict):
+                continue
+            group = row.get("group")
+            if group not in (None, "") and str(group) not in group_ids:
+                group_ids.add(str(group))
+                group_options.append({"value": str(group), "label": f"Missing group (ID {group})"})
     return [
         {"id": "instructions", "type": "info", "label": "Catalog and mappings",
          "description": "After the catalog is downloaded, refreshed, or indexed, click Reload plugin and reopen settings. Dropdowns are not searchable."},
@@ -73,7 +84,24 @@ def make_fields(data_dir, settings, channels):
          ]},
         {"id": "automatic_assignment", "type": "section", "label": "Automatic assignment", "collapsed": False},
         {"id": "automatic_coming_soon", "type": "info", "section": "automatic_assignment",
-         "description": "Automatic assignment is coming soon."},
+         "description": "Configure one row per group. Automatic matching and the run action are not available yet. Path scope is a catalog-relative directory; leave it blank for the entire catalog. Prefix removal applies to name strategies; threshold applies only to fuzzy matching."},
+        {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
+         "columns": [
+             {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
+             {"id": "strategy", "label": "Strategy", "type": "select", "options": [
+                 {"value": "disabled", "label": "Disabled"},
+                 {"value": "exact", "label": "Normalized name"},
+                 {"value": "callsign", "label": "Station call sign"},
+                 {"value": "fuzzy", "label": "Fuzzy name"},
+             ]},
+             {"id": "catalog", "label": "Catalog", "type": "select", "options": [
+                 {"value": catalog.id, "label": catalog.label} for catalog in catalogs.CATALOGS
+             ]},
+             {"id": "scope", "label": "Path scope", "type": "string"},
+             {"id": "replace", "label": "Replace existing logos", "type": "boolean"},
+             {"id": "prefix", "label": "Name prefix to remove", "type": "string"},
+             {"id": "threshold", "label": "Fuzzy threshold (%)", "type": "number"},
+         ]},
         {"id": "catalog_filters_section", "type": "section", "label": "Catalog filters", "collapsed": True},
         {"id": "catalog_filter_instructions", "type": "info", "section": "catalog_filters_section",
          "description": "Filters match full paths without regard to case. Include any matching path, then exclude matches. Save and reload the plugin to update choices. Saved mappings remain available."},

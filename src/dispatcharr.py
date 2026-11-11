@@ -76,3 +76,11 @@ def channel_options():
          if channel.effective_channel_number is not None else f"Unnumbered - {channel.effective_name}"}
         for channel in channels
     ]
+
+
+def group_options():
+    """List stable group IDs, including groups with no current channels."""
+    from apps.channels.models import ChannelGroup
+
+    return [{"value": str(group.id), "label": group.name}
+            for group in ChannelGroup.objects.order_by("name", "id")]

@@ -43,7 +43,7 @@ class PluginTests(unittest.TestCase):
             fields = make_fields(root, {}, [])
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
-            "automatic_assignment", "automatic_coming_soon", "catalog_filters_section",
+            "automatic_assignment", "automatic_coming_soon", "automatic_groups", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
         ])
         by_id = {field["id"]: field for field in fields}
@@ -53,11 +53,20 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["mappings"]["section"], "manual_assignment")
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_coming_soon"]["section"], "automatic_assignment")
-        self.assertIn("coming soon", by_id["automatic_coming_soon"]["description"])
+        self.assertIn("not available yet", by_id["automatic_coming_soon"]["description"])
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
         self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
         self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
         self.assertEqual(len(by_id["catalog_filters"]["columns"][0]["options"]), 8)
+
+    def test_automatic_group_options_preserve_missing_groups(self):
+        settings = {"automatic_groups": [{"group": "1"}, {"group": "9"}, {"group": "9"}]}
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, settings, [], [{"value": "1", "label": "Renamed"}])
+        table = next(field for field in fields if field["id"] == "automatic_groups")
+        self.assertEqual(table["columns"][0]["options"], [
+            {"value": "1", "label": "Renamed"}, {"value": "9", "label": "Missing group (ID 9)"},
+        ])
 
     def test_filters_keep_saved_logo_and_report_invalid_regex(self):
         class Catalog:

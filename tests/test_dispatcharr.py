@@ -6,10 +6,21 @@ import types
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.dispatcharr import assign_logo, channel_options
+from src.dispatcharr import assign_logo, channel_options, group_options
 
 
 class DispatcharrTests(unittest.TestCase):
+    def test_group_options_use_ids_and_current_names(self):
+        group_model = MagicMock()
+        group_model.objects.order_by.return_value = [types.SimpleNamespace(id=7, name="Renamed")]
+        models = types.ModuleType("apps.channels.models")
+        models.ChannelGroup = group_model
+        modules = {"apps": types.ModuleType("apps"), "apps.channels": types.ModuleType("apps.channels"),
+                   "apps.channels.models": models}
+        with patch.dict(sys.modules, modules):
+            self.assertEqual(group_options(), [{"value": "7", "label": "Renamed"}])
+        group_model.objects.order_by.assert_called_once_with("name", "id")
+
     def test_channel_options_use_effective_number_order(self):
         rows = [types.SimpleNamespace(id=1, effective_name="First", effective_channel_number=2.5),
                 types.SimpleNamespace(id=2, effective_name="Second", effective_channel_number=10),

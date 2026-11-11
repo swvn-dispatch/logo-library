@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from .dispatcharr import assign_logo, channel_options, get_plugin_state
+from .dispatcharr import assign_logo, channel_options, get_plugin_state, group_options
 from .fields import make_fields
 from .mappings import apply_mappings
 from . import catalogs
@@ -22,7 +22,7 @@ class Plugin:
     @property
     def fields(self):
         data_dir, settings = get_plugin_state(Path(__file__).parent)
-        return make_fields(data_dir, settings, channel_options())
+        return make_fields(data_dir, settings, channel_options(), group_options())
 
     def on_leader_acquired(self, context):
         for catalog in catalogs.CATALOGS:
