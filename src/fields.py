@@ -73,7 +73,7 @@ def make_fields(data_dir, settings, channels, groups=()):
                 group_options.append({"value": str(group), "label": f"Missing group (ID {group})"})
     return [
         {"id": "instructions", "type": "info", "label": "Catalog and mappings",
-         "description": "After the catalog is downloaded, refreshed, or indexed, click Reload plugin and reopen settings. Dropdowns are not searchable."},
+         "description": "After a catalog is downloaded, refreshed, or indexed, it is recommended to click Reload plugin."},
         {"id": "manual_assignment", "type": "section", "label": "Manual assignment", "collapsed": False},
         {"id": "manual_instructions", "type": "info", "section": "manual_assignment",
          "description": "Save mappings before running Apply changes. Removing a mapping does not remove the channel's assigned logo."},

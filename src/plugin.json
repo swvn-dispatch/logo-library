@@ -18,7 +18,7 @@
     {
       "id": "update_catalog",
       "label": "Refresh TV Logos library",
-      "description": "Download the latest tv-logos catalog. Reload the plugin afterward.",
+      "description": "Download the latest tv-logos catalog.",
       "button_label": "Refresh TV Logos library",
       "button_color": "teal",
       "async": true
