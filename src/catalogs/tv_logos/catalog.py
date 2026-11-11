@@ -9,6 +9,7 @@ import shutil
 import stat
 import tempfile
 import re
+import time
 import urllib.request
 import uuid
 import zipfile
@@ -20,6 +21,9 @@ MAX_EXTRACTED_BYTES = 1024 * 1024 * 1024
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_ENTRIES = 100_000
 CHUNK_SIZE = 1024 * 1024
+INDEX_NAME = ".logo-library-index.json"
+INDEX_VERSION = 1
+REQUEST_DEBOUNCE_SECONDS = 300
 _SNAPSHOT_NAME = re.compile(r"snapshot-[0-9a-f]{32}\Z")
 logger = logging.getLogger(__name__)
 
@@ -75,6 +79,86 @@ def logo_paths(snapshot):
             except UnicodeDecodeError:
                 logger.warning("Skipping catalog logo with a non-UTF-8 filename: %r", path)
     return sorted(result, key=str.casefold)
+
+
+def read_index(snapshot):
+    """Read an immutable snapshot index without taking the catalog update lock."""
+    if snapshot is None:
+        return None
+    try:
+        with (snapshot / INDEX_NAME).open(encoding="utf-8") as source:
+            data = json.load(source)
+        paths = data["paths"]
+        if data.get("version") != INDEX_VERSION or not isinstance(paths, list):
+            return None
+        if not all(isinstance(path, str) for path in paths):
+            return None
+        return paths
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def _write_index(snapshot, paths):
+    """Atomically replace an index inside a snapshot owned by this catalog."""
+    fd, temp = tempfile.mkstemp(prefix=".logo-library-index-", dir=snapshot)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as output:
+            json.dump({"version": INDEX_VERSION, "paths": paths}, output, ensure_ascii=True)
+        os.replace(temp, snapshot / INDEX_NAME)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def ensure_index(data_dir):
+    """Build an index for an existing snapshot once, outside worker startup."""
+    with catalog_lock(data_dir, exclusive=True):
+        snapshot = current_catalog(data_dir)
+        if snapshot is None:
+            return None
+        paths = read_index(snapshot)
+        if paths is None:
+            paths = logo_paths(snapshot)
+            _write_index(snapshot, paths)
+        return len(paths)
+
+
+def reserve_initialization(data_dir):
+    """Debounce background initialization requests across leaders and processes."""
+    root = Path(data_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    with (root / "index-request.lock").open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        marker = root / "index-request.json"
+        try:
+            try:
+                request = json.loads(marker.read_text(encoding="utf-8"))
+                if time.time() - float(request["time"]) < REQUEST_DEBOUNCE_SECONDS:
+                    return None
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
+            token = uuid.uuid4().hex
+            marker.write_text(json.dumps({"token": token, "time": time.time()}), encoding="utf-8")
+            return token
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def release_initialization(data_dir, token):
+    if not token:
+        return
+    root = Path(data_dir)
+    with (root / "index-request.lock").open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            marker = root / "index-request.json"
+            try:
+                if json.loads(marker.read_text(encoding="utf-8")).get("token") == token:
+                    marker.unlink()
+            except (OSError, ValueError, TypeError):
+                pass
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 def resolve_logo(snapshot, relative):
@@ -152,7 +236,7 @@ def _extract(archive, destination):
             count += 1
     if not count:
         raise CatalogError("Catalog archive contains no PNG images")
-    return count
+    return sorted(seen, key=str.casefold)
 
 
 def _cleanup_snapshots(root, keep):
@@ -186,7 +270,8 @@ def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=Fals
             snapshot.mkdir()
             try:
                 _download(archive, opener)
-                count = _extract(archive, snapshot)
+                paths = _extract(archive, snapshot)
+                _write_index(snapshot, paths)
             except (OSError, zipfile.BadZipFile, EOFError) as exc:
                 raise CatalogError(f"Catalog update failed: {exc}") from exc
             name = "snapshot-" + uuid.uuid4().hex
@@ -195,4 +280,4 @@ def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=Fals
             marker.write_text(json.dumps({"snapshot": name}), encoding="utf-8")
             os.replace(marker, root / "catalog.json")
             _cleanup_snapshots(root, {name, previous.name if previous else name})
-            return count
+            return len(paths)

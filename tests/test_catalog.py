@@ -1,4 +1,5 @@
 import io
+from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import stat
@@ -7,7 +8,11 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from src.catalogs.tv_logos.catalog import CatalogError, current_catalog, logo_paths, resolve_logo, update_catalog
+from src.catalogs.tv_logos.catalog import (
+    INDEX_NAME, CatalogError, current_catalog, ensure_index, logo_paths, read_index,
+    release_initialization, reserve_initialization, resolve_logo, update_catalog,
+)
+from src.catalogs.tv_logos import TvLogosCatalog
 
 
 def archive(files):
@@ -30,8 +35,57 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(update_catalog(root, opener(data)), 1)
             snapshot = current_catalog(root)
             self.assertEqual(logo_paths(snapshot), ["countries/nordic/a.png"])
+            self.assertEqual(read_index(snapshot), ["countries/nordic/a.png"])
             self.assertEqual(resolve_logo(snapshot, "countries/nordic/a.png").read_bytes(), b"image")
             self.assertIsNone(update_catalog(root, opener(b"invalid"), only_if_missing=True))
+
+    def test_options_never_walk_or_wait_for_catalog_lock(self):
+        with tempfile.TemporaryDirectory() as root:
+            update_catalog(root, opener(archive([("root/a.png", b"image")])))
+            with patch("os.walk", side_effect=AssertionError("startup must not walk")), \
+                 patch("src.catalogs.tv_logos.catalog.fcntl.flock", side_effect=AssertionError("startup must not lock")):
+                self.assertEqual(TvLogosCatalog().options(root), ["a.png"])
+                (current_catalog(root) / INDEX_NAME).unlink()
+                self.assertEqual(TvLogosCatalog().options(root), [])
+
+    def test_existing_catalog_is_indexed_once(self):
+        with tempfile.TemporaryDirectory() as root:
+            update_catalog(root, opener(archive([("root/a.png", b"image")])))
+            snapshot = current_catalog(root)
+            (snapshot / INDEX_NAME).unlink()
+            with patch("src.catalogs.tv_logos.catalog.logo_paths", wraps=logo_paths) as scan:
+                self.assertEqual(ensure_index(root), 1)
+                self.assertEqual(ensure_index(root), 1)
+                scan.assert_called_once_with(snapshot)
+            self.assertEqual(read_index(snapshot), ["a.png"])
+
+    def test_initialization_requests_are_debounced_and_token_scoped(self):
+        with tempfile.TemporaryDirectory() as root:
+            with patch("src.catalogs.tv_logos.catalog.time.time", return_value=1000):
+                first = reserve_initialization(root)
+                self.assertIsNotNone(first)
+                self.assertIsNone(reserve_initialization(root))
+            with patch("src.catalogs.tv_logos.catalog.time.time", return_value=1400):
+                second = reserve_initialization(root)
+                self.assertIsNotNone(second)
+                release_initialization(root, first)
+                self.assertIsNone(reserve_initialization(root))
+                release_initialization(root, second)
+                self.assertIsNotNone(reserve_initialization(root))
+
+    def test_concurrent_initialization_requests_only_reserve_once(self):
+        with tempfile.TemporaryDirectory() as root:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                tokens = list(pool.map(lambda _: reserve_initialization(root), range(16)))
+            self.assertEqual(sum(token is not None for token in tokens), 1)
+
+    def test_corrupt_index_is_treated_as_missing(self):
+        with tempfile.TemporaryDirectory() as root:
+            update_catalog(root, opener(archive([("root/a.png", b"image")])))
+            snapshot = current_catalog(root)
+            (snapshot / INDEX_NAME).write_text("[]")
+            self.assertIsNone(read_index(snapshot))
+            self.assertEqual(ensure_index(root), 1)
 
     def test_utf8_paths_work_with_ascii_filesystem_decoding(self):
         names = ["countries/école.png", "countries/новости.png"]

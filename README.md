@@ -105,3 +105,6 @@ README for attribution and usage terms.
 The catalog is downloaded locally when the plugin is enabled. Use
 **Refresh TV Logos library** to refresh it. The current and previous snapshots are
 retained, and updates need temporary space for the archive and extracted images.
+Logo choices come from a cached index rather than a filesystem scan at worker
+startup. Existing installations build a missing index in the background. Reload
+the plugin and reopen its settings once indexing completes.

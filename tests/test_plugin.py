@@ -7,6 +7,9 @@ from unittest.mock import patch
 from src import Plugin
 from src.fields import make_fields
 from src.catalogs import catalog_actions
+from src.catalogs.tv_logos import TvLogosCatalog
+from src.catalogs.tv_logos.catalog import INDEX_NAME, current_catalog, read_index, update_catalog
+from test_catalog import archive, opener
 
 
 class PluginTests(unittest.TestCase):
@@ -83,11 +86,47 @@ class PluginTests(unittest.TestCase):
         plugin = Plugin()
         calls = []
         with tempfile.TemporaryDirectory() as root:
-            with patch("src.catalogs.tv_logos.current_catalog", return_value=None):
+            with patch("src.catalogs.tv_logos.current_catalog", return_value=None), \
+                 patch("src.catalogs.tv_logos.read_index", return_value=None):
                 plugin.on_leader_acquired({"data_dir": root, "dispatch_task": lambda *args: calls.append(args)})
-            with patch("src.catalogs.tv_logos.current_catalog", return_value=Path(root)):
+            with patch("src.catalogs.tv_logos.current_catalog", return_value=Path(root)), \
+                 patch("src.catalogs.tv_logos.read_index", return_value=["a.png"]):
                 plugin.on_leader_acquired({"data_dir": root, "dispatch_task": lambda *args: calls.append(args)})
-        self.assertEqual(calls, [("update_catalog", {"initial": True})])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "update_catalog")
+        self.assertTrue(calls[0][1]["initial"])
+        self.assertTrue(calls[0][1]["request_token"])
+
+    def test_existing_catalog_is_indexed_by_debounced_leader_task(self):
+        catalog = TvLogosCatalog()
+        calls = []
+        with tempfile.TemporaryDirectory() as root:
+            update_catalog(root, opener(archive([("root/a.png", b"image")])))
+            snapshot = current_catalog(root)
+            (snapshot / INDEX_NAME).unlink()
+            context = {"data_dir": root, "dispatch_task": lambda *args: calls.append(args)}
+            catalog.on_leader_acquired(context)
+            catalog.on_leader_acquired(context)
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(catalog.options(root), [])
+            result = catalog.run(calls[0][0], calls[0][1], context)
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(read_index(snapshot), ["a.png"])
+            self.assertEqual(catalog.options(root), ["a.png"])
+            catalog.on_leader_acquired(context)
+            self.assertEqual(len(calls), 1)
+
+    def test_failed_dispatch_releases_debounce_reservation(self):
+        catalog = TvLogosCatalog()
+        with tempfile.TemporaryDirectory() as root:
+            def fail(*args):
+                raise RuntimeError("queue unavailable")
+
+            with self.assertRaises(RuntimeError):
+                catalog.on_leader_acquired({"data_dir": root, "dispatch_task": fail})
+            calls = []
+            catalog.on_leader_acquired({"data_dir": root, "dispatch_task": lambda *args: calls.append(args)})
+            self.assertEqual(len(calls), 1)
 
     def test_action_reports_partial_result(self):
         with patch("src.apply_mappings", return_value={"applied": 1, "skipped": 1, "errors": [
@@ -105,7 +144,7 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("update_catalog", {}, {"data_dir": "/test"})
         self.assertEqual(result["status"], "ok")
         self.assertIn("3", result["message"])
-        update.assert_called_once_with("/test", only_if_missing=False)
+        update.assert_called_once_with("/test")
 
     def test_options_include_multiple_catalog_namespaces(self):
         class Catalog:

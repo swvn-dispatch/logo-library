@@ -62,7 +62,7 @@ def make_fields(data_dir, settings, channels):
             logo_options.append({"value": logo, "label": label})
     return [
         {"id": "instructions", "type": "info", "label": "Catalog and mappings",
-         "description": "After the catalog is downloaded or refreshed, click Reload plugin and reopen settings. Dropdowns are not searchable."},
+         "description": "After the catalog is downloaded, refreshed, or indexed, click Reload plugin and reopen settings. Dropdowns are not searchable."},
         {"id": "manual_assignment", "type": "section", "label": "Manual assignment", "collapsed": False},
         {"id": "manual_instructions", "type": "info", "section": "manual_assignment",
          "description": "Save mappings before running Apply changes. Removing a mapping does not remove the channel's assigned logo."},
