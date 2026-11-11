@@ -1,0 +1,63 @@
+name: Build and Release Plugin
+
+on:
+  release:
+    types: [published, released]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Test
+        run: python3 -m unittest discover -s tests -v
+      - name: Determine version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            version="${tag#v}"
+            prerelease=$(gh release view "$tag" --json isPrerelease --jq '.isPrerelease')
+            if [ "$prerelease" = true ]; then version="${version}-pre"; fi
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            version="0.0.0-dev-$(git rev-parse --short=8 HEAD)"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Package
+        run: ./package.sh --version '${{ steps.version.outputs.version }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: logo-library-${{ steps.version.outputs.version }}
+          path: logo-library-${{ steps.version.outputs.version }}.zip
+      - name: Upload release asset
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ steps.version.outputs.tag }}' 'logo-library-${{ steps.version.outputs.version }}.zip' --clobber
+      - name: Notify aggregator
+        if: steps.version.outputs.release == 'true'
+        env:
+          PAT: ${{ secrets.SETH_PAT }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          aggregator=$(python3 -c "import json; print(json.load(open('.github/workflows/manifest-config.json'))['aggregator_repo'])")
+          if [ -z "$PAT" ] || [ -z "$aggregator" ]; then echo 'Aggregator dispatch not configured'; exit 0; fi
+          curl -fsS -X POST -H "Authorization: Bearer $PAT" -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$aggregator/dispatches" \
+            -d "{\"event_type\":\"plugin-updated\",\"client_payload\":{\"repo\":\"$REPOSITORY\"}}"

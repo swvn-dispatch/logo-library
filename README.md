@@ -7,9 +7,10 @@ downloaded separately and are not distributed with this repository.
 
 ## Development status
 
-This repository is under construction. The manifest and initial Dispatcharr
-integration are present, but packaging, release workflows, and live integration
-validation remain outstanding. Do not use it in production yet.
+This repository is under construction. The manifest, initial Dispatcharr
+integration, packaging, and release workflows are present, but live integration
+validation and registry publishing remain outstanding. Do not use it in
+production yet.
 
 The plugin begins downloading the catalog when enabled. After the download or
 an Update catalog action, click **Reload plugin** and reopen its settings.
@@ -29,6 +30,12 @@ Run the offline tests with:
 python3 -m unittest discover -s tests -v
 ```
 
-Catalog snapshots are currently retained after updates to avoid invalidating
-readers. Snapshot cleanup and disk usage management must be addressed before a
-release. No live Dispatcharr integration or minimum supported version has been verified.
+Build a local archive with `./package.sh`. To package a specific version
+without changing the source manifest, use `./package.sh --version 0.1.0`.
+Release workflows require a GitHub repository and an aggregator dispatch token.
+The dev rebase workflow updates the remote `dev` branch on pushes to `main` and
+stops on conflicts rather than resolving them automatically.
+
+The current and previous catalog snapshots are retained; a new update also
+requires temporary space for its archive and extracted files. No live
+Dispatcharr integration or minimum supported version has been verified.

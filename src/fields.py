@@ -1,11 +1,12 @@
 """Build native Dispatcharr settings fields from the current catalog."""
 
-from .catalog import CatalogError, current_catalog, logo_paths
+from .catalog import CatalogError, catalog_lock, current_catalog, logo_paths
 
 
 def make_fields(data_dir, settings, channels):
     try:
-        logos = logo_paths(current_catalog(data_dir))
+        with catalog_lock(data_dir, exclusive=False):
+            logos = logo_paths(current_catalog(data_dir))
     except CatalogError:
         logos = []
     channel_options = list(channels)

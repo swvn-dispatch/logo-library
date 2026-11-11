@@ -1,0 +1,69 @@
+name: Publish Dev Pre-release
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-prerelease
+  cancel-in-progress: true
+
+jobs:
+  dev-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Test
+        run: python3 -m unittest discover -s tests -v
+      - name: Determine version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          hash=$(git rev-parse --short=8 HEAD)
+          latest=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')
+          base="${latest#v}"
+          base="${base:-0.0.0}"
+          echo "version=${base}-dev-${hash}" >> "$GITHUB_OUTPUT"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+      - name: Package
+        run: ./package.sh --version '${{ steps.version.outputs.version }}'
+      - name: Create immutable dev prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='v${{ steps.version.outputs.version }}'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; preserving its artifact."
+            exit 0
+          fi
+          gh release create "$tag" --target "$GITHUB_SHA" --prerelease \
+            --title 'Dev Build (${{ steps.version.outputs.hash }})' \
+            --notes 'Logo Library development build.' 'logo-library-${{ steps.version.outputs.version }}.zip'
+      - name: Prune old dev prereleases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName,isPrerelease,publishedAt \
+            --jq '[.[] | select(.isPrerelease and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-dev-[0-9a-f]{8}$")))] | sort_by(.publishedAt) | reverse | .[5:][] | .tagName' \
+            | while IFS= read -r tag; do
+                [ -n "$tag" ] || continue
+                gh release delete "$tag" --cleanup-tag --yes || echo "::warning::Could not delete $tag"
+              done
+      - name: Notify aggregator
+        env:
+          PAT: ${{ secrets.SETH_PAT }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          aggregator=$(python3 -c "import json; print(json.load(open('.github/workflows/manifest-config.json'))['aggregator_repo'])")
+          if [ -z "$PAT" ] || [ -z "$aggregator" ]; then echo 'Aggregator dispatch not configured'; exit 0; fi
+          curl -fsS -X POST -H "Authorization: Bearer $PAT" -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$aggregator/dispatches" \
+            -d "{\"event_type\":\"plugin-dev-updated\",\"client_payload\":{\"repo\":\"$REPOSITORY\"}}"

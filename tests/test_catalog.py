@@ -68,6 +68,26 @@ class CatalogTests(unittest.TestCase):
                 update_catalog(root, opener(buffer.getvalue()))
             self.assertIsNone(current_catalog(root))
 
+    def test_keeps_current_and_previous_owned_snapshots_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            paths = []
+            for i in range(3):
+                update_catalog(root, opener(archive([("root/a.png", str(i).encode())])))
+                paths.append(current_catalog(root))
+            self.assertFalse(paths[0].exists())
+            self.assertTrue(paths[1].exists())
+            self.assertEqual((paths[2] / "a.png").read_bytes(), b"2")
+
+    def test_cleanup_ignores_unowned_directories_and_symlinks(self):
+        with tempfile.TemporaryDirectory() as root:
+            unrelated = Path(root) / "snapshot-other"
+            unrelated.mkdir()
+            symlink = Path(root) / ("snapshot-" + "f" * 32)
+            symlink.symlink_to(unrelated, target_is_directory=True)
+            update_catalog(root, opener(archive([("root/a.png", b"a")])))
+            self.assertTrue(unrelated.exists())
+            self.assertTrue(symlink.is_symlink())
+
 
 if __name__ == "__main__":
     unittest.main()

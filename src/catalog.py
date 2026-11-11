@@ -2,11 +2,13 @@
 
 import fcntl
 import json
+import logging
 import os
 from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import tempfile
+import re
 import urllib.request
 import uuid
 import zipfile
@@ -18,6 +20,8 @@ MAX_EXTRACTED_BYTES = 1024 * 1024 * 1024
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_ENTRIES = 100_000
 CHUNK_SIZE = 1024 * 1024
+_SNAPSHOT_NAME = re.compile(r"snapshot-[0-9a-f]{32}\Z")
+logger = logging.getLogger(__name__)
 
 
 class CatalogError(Exception):
@@ -46,7 +50,7 @@ def current_catalog(data_dir):
         return None
     except (ValueError, KeyError, TypeError) as exc:
         raise CatalogError("Catalog metadata is invalid") from exc
-    if not isinstance(name, str) or not name.startswith("snapshot-") or Path(name).name != name:
+    if not isinstance(name, str) or not _SNAPSHOT_NAME.fullmatch(name):
         raise CatalogError("Catalog snapshot name is invalid")
     path = root / name
     if path.is_symlink() or not path.is_dir():
@@ -143,15 +147,29 @@ def _extract(archive, destination):
     return count
 
 
+def _cleanup_snapshots(root, keep):
+    """Remove only owned snapshots, while holding the exclusive catalog lock."""
+    for path in root.iterdir():
+        if path.name in keep or not _SNAPSHOT_NAME.fullmatch(path.name):
+            continue
+        if path.is_symlink() or not path.is_dir():
+            continue
+        try:
+            shutil.rmtree(path)
+        except OSError:
+            logger.warning("Could not remove old catalog snapshot %s", path, exc_info=True)
+
+
 def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=False):
     """Publish a complete snapshot while retaining the prior one on failure.
 
-    Snapshots are immutable and retained so readers that captured an older
-    snapshot cannot lose it during an update. Cleanup is intentionally deferred.
+    Readers must hold the shared catalog lock for the whole snapshot read.
+    The active and immediately preceding snapshots are retained.
     """
     root = Path(data_dir)
     with catalog_lock(root, exclusive=True):
-        if only_if_missing and current_catalog(root) is not None:
+        previous = current_catalog(root)
+        if only_if_missing and previous is not None:
             return None
         with tempfile.TemporaryDirectory(prefix="catalog-update-", dir=root) as temp:
             temp_path = Path(temp)
@@ -168,4 +186,5 @@ def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=Fals
             marker = temp_path / "catalog.json"
             marker.write_text(json.dumps({"snapshot": name}), encoding="utf-8")
             os.replace(marker, root / "catalog.json")
+            _cleanup_snapshots(root, {name, previous.name if previous else name})
             return count
