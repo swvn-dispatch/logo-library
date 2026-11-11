@@ -3,7 +3,9 @@
 import json
 from pathlib import Path
 
-from .dispatcharr import assign_logo, channel_options, get_plugin_state, group_options
+from .dispatcharr import (assign_logo, automatic_channels, channel_options, get_plugin_state,
+                          group_options, guarded_assign_logo)
+from .automatic_run import run_automatic
 from .fields import make_fields
 from .mappings import apply_mappings
 from . import catalogs
@@ -29,6 +31,20 @@ class Plugin:
             catalog.on_leader_acquired(context)
 
     def run(self, action, params, context):
+        if action == "run_automatic":
+            groups = [option["value"] for option in group_options()]
+            result = run_automatic(context["data_dir"], context.get("settings", {}), automatic_channels(),
+                                   groups, catalogs.CATALOGS,
+                                   lambda *args: guarded_assign_logo(Path(__file__).parent, *args))
+            status = "partial" if result["skipped"] or result["failed"] or result["configuration_errors"] else "ok"
+            message = f"Applied {result['applied']}, skipped {result['skipped']}, failed {result['failed']}."
+            details = result["configuration_errors"] + [
+                f"channel {item['channel']} ({item['name']}): {item['reason']}"
+                for item in result["channels"] if item["status"] != "applied"
+            ]
+            if details:
+                message += " " + "; ".join(details)
+            return {"status": status, "message": message, **result}
         if action == "apply_changes":
             result = apply_mappings(context["data_dir"], context.get("settings", {}).get("mappings", []), assign_logo)
             status = "partial" if result["skipped"] else "ok"

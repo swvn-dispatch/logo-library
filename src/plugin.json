@@ -16,6 +16,13 @@
       "async": true
     },
     {
+      "id": "run_automatic",
+      "label": "Run automatic matching",
+      "description": "Match and assign logos for configured groups using saved settings.",
+      "button_label": "Run automatic matching",
+      "async": true
+    },
+    {
       "id": "update_catalog",
       "label": "Refresh TV Logos library",
       "description": "Download the latest tv-logos catalog.",

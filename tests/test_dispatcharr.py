@@ -6,10 +6,68 @@ import types
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.dispatcharr import assign_logo, channel_options, group_options
+from src.dispatcharr import assign_logo, automatic_channels, channel_options, group_options, guarded_assign_logo
 
 
 class DispatcharrTests(unittest.TestCase):
+    def test_automatic_channel_snapshot_uses_effective_values(self):
+        row = types.SimpleNamespace(id=1, effective_name="Override", effective_channel_group_id=2, effective_logo_id=3)
+        models = types.ModuleType("apps.channels.models")
+        models.Channel = MagicMock()
+        managers = types.ModuleType("apps.channels.managers")
+        managers.with_effective_values = MagicMock(return_value=[row])
+        with patch.dict(sys.modules, {"apps": types.ModuleType("apps"), "apps.channels": types.ModuleType("apps.channels"),
+                                      "apps.channels.models": models, "apps.channels.managers": managers}):
+            self.assertEqual(automatic_channels(), [{"id": 1, "name": "Override", "group_id": 2, "logo_id": 3}])
+
+    def test_guard_rechecks_current_settings_and_effective_values(self):
+        settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
+        expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
+                    "prefix": "", "threshold": None}
+        plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
+        plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
+        channel = types.SimpleNamespace(channel_group_id=8, name="Raw", logo_id=None)
+        channel_model.objects.select_for_update.return_value.filter.return_value.first.return_value = channel
+        override = types.SimpleNamespace(channel_group_id=2, name="Effective", logo_id=None)
+        override_model.objects.select_for_update.return_value.filter.return_value.first.return_value = override
+        group_model.objects.filter.return_value.exists.return_value = True
+        models = types.ModuleType("apps.channels.models")
+        models.Channel, models.ChannelOverride, models.ChannelGroup = channel_model, override_model, group_model
+        plugin_models = types.ModuleType("apps.plugins.models")
+        plugin_models.PluginConfig = plugin_model
+        loader = types.ModuleType("apps.plugins.loader")
+        loader.normalize_plugin_key = lambda name: name
+        db = types.ModuleType("django.db")
+        db.transaction = types.SimpleNamespace(atomic=lambda: nullcontext())
+        modules = {"django": types.ModuleType("django"), "django.db": db, "apps": types.ModuleType("apps"),
+                   "apps.channels": types.ModuleType("apps.channels"), "apps.channels.models": models,
+                   "apps.plugins": types.ModuleType("apps.plugins"), "apps.plugins.models": plugin_models,
+                   "apps.plugins.loader": loader}
+        with patch.dict(sys.modules, modules), patch("src.dispatcharr.assign_logo") as assign:
+            args = ("/plugin", "1", "2", "Effective", expected, "tv_logos:a.png", Path("a.png"))
+            self.assertIsNone(guarded_assign_logo(*args))
+            assign.assert_called_once()
+            settings["mappings"] = [{"channel": "1"}]
+            self.assertEqual(guarded_assign_logo(*args), "manual_mapping")
+            settings["mappings"] = []
+            override.logo_id = 5
+            self.assertEqual(guarded_assign_logo(*args), "existing_logo")
+            override.logo_id = None
+            override.name = "Changed"
+            self.assertEqual(guarded_assign_logo(*args), "channel_changed")
+            override.name = "Effective"
+            override.channel_group_id = 3
+            self.assertEqual(guarded_assign_logo(*args), "channel_changed")
+            override.channel_group_id = 2
+            settings["automatic_groups"].append(dict(settings["automatic_groups"][0]))
+            self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+            settings["automatic_groups"].pop()
+            settings["automatic_groups"][0]["strategy"] = "disabled"
+            self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+            group_model.objects.filter.return_value.exists.return_value = False
+            self.assertEqual(guarded_assign_logo(*args), "missing_group")
+            assign.assert_called_once()
+
     def test_group_options_use_ids_and_current_names(self):
         group_model = MagicMock()
         group_model.objects.order_by.return_value = [types.SimpleNamespace(id=7, name="Renamed")]

@@ -16,14 +16,14 @@ class PluginTests(unittest.TestCase):
     def test_manifest_contract(self):
         manifest = json.loads((Path(__file__).parents[1] / "src" / "plugin.json").read_text())
         self.assertEqual(manifest["manifest_version"], 2)
-        self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes"})
+        self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes", "run_automatic"})
         self.assertTrue(all(action["async"] for action in manifest["actions"]))
         self.assertEqual(manifest["actions"][0]["id"], "apply_changes")
         manifest_actions = {action["id"]: action for action in manifest["actions"]}
         declared = catalog_actions()
         self.assertEqual(len({action["id"] for action in declared}), len(declared))
         self.assertNotIn("apply_changes", {action["id"] for action in declared})
-        self.assertEqual(set(manifest_actions) - {"apply_changes"}, {action["id"] for action in declared})
+        self.assertEqual(set(manifest_actions) - {"apply_changes", "run_automatic"}, {action["id"] for action in declared})
         for action in declared:
             self.assertEqual(manifest_actions[action["id"]], action)
         self.assertEqual(manifest_actions["update_catalog"]["button_color"], "teal")
@@ -53,7 +53,7 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["mappings"]["section"], "manual_assignment")
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_coming_soon"]["section"], "automatic_assignment")
-        self.assertIn("not available yet", by_id["automatic_coming_soon"]["description"])
+        self.assertIn("Groups without an enabled row are skipped", by_id["automatic_coming_soon"]["description"])
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
         self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
         self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
@@ -144,6 +144,15 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": {"mappings": []}})
         self.assertEqual(result["status"], "partial")
         self.assertIn("channel 44", result["message"])
+
+    def test_automatic_action_reports_details(self):
+        report = {"applied": 0, "skipped": 1, "failed": 0, "configuration_errors": [],
+                  "channels": [{"channel": "1", "name": "Test", "status": "skipped", "reason": "manual_mapping"}]}
+        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[]), \
+             patch("src.run_automatic", return_value=report):
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
+        self.assertEqual(result["status"], "partial")
+        self.assertIn("channel 1 (Test): manual_mapping", result["message"])
 
     def test_unknown_action(self):
         self.assertEqual(Plugin().run("unknown", {}, {})["status"], "error")

@@ -84,3 +84,56 @@ def group_options():
 
     return [{"value": str(group.id), "label": group.name}
             for group in ChannelGroup.objects.order_by("name", "id")]
+
+
+def automatic_channels():
+    """Take an effective-value snapshot for an explicitly requested run."""
+    from apps.channels.managers import with_effective_values
+    from apps.channels.models import Channel
+
+    return [{"id": channel.id, "name": channel.effective_name,
+             "group_id": channel.effective_channel_group_id, "logo_id": channel.effective_logo_id}
+            for channel in with_effective_values(Channel.objects.all())]
+
+
+def guarded_assign_logo(code_dir, channel_id, group_id, name, expected, identity, image):
+    """Recheck saved settings and effective values in the assignment transaction."""
+    from django.db import transaction
+    from apps.channels.models import Channel, ChannelGroup, ChannelOverride
+    from apps.plugins.loader import normalize_plugin_key
+    from apps.plugins.models import PluginConfig
+    from . import catalogs
+    from .automatic import compile_groups
+
+    with transaction.atomic():
+        key = normalize_plugin_key(Path(code_dir).name)
+        plugin = PluginConfig.objects.select_for_update().filter(key=key).first()
+        if plugin is None or not isinstance(plugin.settings, dict):
+            return "settings_changed"
+        settings = plugin.settings
+        mappings = settings.get("mappings", [])
+        if not isinstance(mappings, list):
+            return "settings_changed"
+        if any(isinstance(row, dict) and str(row.get("channel")) == channel_id for row in mappings):
+            return "manual_mapping"
+        if not ChannelGroup.objects.filter(pk=group_id).exists():
+            return "missing_group"
+        groups, _ = compile_groups(settings.get("automatic_groups", []), [group_id],
+                                   {catalog.id for catalog in catalogs.CATALOGS})
+        if groups.get(group_id) != expected:
+            return "settings_changed"
+        channel = Channel.objects.select_for_update().filter(pk=channel_id).first()
+        if channel is None:
+            return "missing_channel"
+        override = ChannelOverride.objects.select_for_update().filter(channel_id=channel_id).first()
+
+        def effective(field):
+            override_value = getattr(override, field, None)
+            return override_value if override_value is not None else getattr(channel, field)
+
+        if str(effective("channel_group_id")) != group_id or effective("name") != name:
+            return "channel_changed"
+        if effective("logo_id") is not None and not expected["replace"]:
+            return "existing_logo"
+        assign_logo(channel_id, identity, image)
+        return None

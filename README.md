@@ -29,9 +29,16 @@ logos do not depend on the plugin being enabled or on a catalog being reachable.
 - Update a logo catalog using its action.
 - Use **Apply changes** to refresh assigned copies after catalog updates.
 
-Automatic assignment is planned but is not implemented.
+Automatic assignment runs only when explicitly requested. Under **Automatic
+assignment**, add and save a row for each group to enable, select a strategy,
+catalog and optional directory scope, then run **Run automatic matching**.
+Groups without a valid enabled row are skipped. Saved manual mappings always
+take precedence, including incomplete mappings with a channel selected. By
+default, channels with an effective logo are skipped; select **Replace existing
+logos** for a group to allow replacement. Review the action result for skipped
+channels and failures. Catalog updates do not trigger matching.
 
-The in-development normalized-name matcher uses Unicode normalization,
+The normalized-name matcher uses Unicode normalization,
 case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
 It preserves digits and does not transliterate or equate spelled-out numbers
 with digits. An optional literal channel-name prefix is removed first. For TV
@@ -40,14 +47,14 @@ country directories; `hd`, `hz`, and `horizontal` filename suffixes are treated
 as variants. Multiple matching paths are ambiguous and are not selected. Other
 country suffixes remain part of the name until explicitly supported.
 
-The in-development call-sign matcher only considers uppercase US-style `K` or
+The call-sign matcher only considers uppercase US-style `K` or
 `W` call signs in channel names and station-specific TV Logos paths under
 `countries/united-states/us-local`. The configured directory scope narrows those
 paths further. Multiple call signs or matching logo variants are skipped. This
 heuristic does not verify station identity and does not support Canadian call
 signs or guide metadata yet.
 
-The in-development fuzzy matcher scores normalized names with Python's
+The fuzzy matcher scores normalized names with Python's
 `SequenceMatcher` ratio, expressed as a percentage. A match must score strictly
 above the configured threshold, so a threshold of 100 cannot match anything.
 Digit sequences and the presence of `plus` must agree. Exact top-score ties

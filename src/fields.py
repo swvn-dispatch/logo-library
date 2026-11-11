@@ -84,7 +84,7 @@ def make_fields(data_dir, settings, channels, groups=()):
          ]},
         {"id": "automatic_assignment", "type": "section", "label": "Automatic assignment", "collapsed": False},
         {"id": "automatic_coming_soon", "type": "info", "section": "automatic_assignment",
-         "description": "Configure one row per group. Automatic matching and the run action are not available yet. Path scope is a catalog-relative directory; leave it blank for the entire catalog. Prefix removal applies to name strategies; threshold applies only to fuzzy matching."},
+         "description": "Configure one row per group and save before running automatic matching. Groups without an enabled row are skipped. Saved manual mappings take priority. Path scope is a catalog-relative directory; leave it blank for the entire catalog. Prefix removal applies to name strategies; threshold applies only to fuzzy matching."},
         {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
          "columns": [
              {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
