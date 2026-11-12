@@ -205,6 +205,7 @@ class DispatcharrTests(unittest.TestCase):
                            "apps.channels.models": models}
                 source = Path(root) / "source.png"
                 source.write_bytes(b"image")
+                (Path(root) / "logos").mkdir()
                 with patch.dict(sys.modules, modules):
                     assign_logo("12", "countries/a.png", source, Path(root) / "logos")
                 destination = Path(logo_model.objects.get_or_create.call_args.kwargs["url"])

@@ -36,7 +36,6 @@ class CatalogError(Exception):
 def catalog_lock(data_dir, exclusive):
     """Coordinate updates and readers across local Dispatcharr processes."""
     root = Path(data_dir)
-    root.mkdir(parents=True, exist_ok=True)
     with (root / "catalog.lock").open("a+b") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
         try:
@@ -126,7 +125,6 @@ def ensure_index(data_dir):
 def reserve_initialization(data_dir):
     """Debounce background initialization requests across leaders and processes."""
     root = Path(data_dir)
-    root.mkdir(parents=True, exist_ok=True)
     with (root / "index-request.lock").open("a+b") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         marker = root / "index-request.json"
@@ -239,7 +237,7 @@ def _extract(archive, destination):
     return sorted(seen, key=str.casefold)
 
 
-def _cleanup_snapshots(root, keep):
+def _cleanup_snapshots(root, keep, remove_directory):
     """Remove only owned snapshots, while holding the exclusive catalog lock."""
     for path in root.iterdir():
         if path.name in keep or not _SNAPSHOT_NAME.fullmatch(path.name):
@@ -247,12 +245,12 @@ def _cleanup_snapshots(root, keep):
         if path.is_symlink() or not path.is_dir():
             continue
         try:
-            shutil.rmtree(path)
+            remove_directory(path)
         except OSError:
             logger.warning("Could not remove old catalog snapshot %s", path, exc_info=True)
 
 
-def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=False):
+def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=False, *, remove_directory):
     """Publish a complete snapshot while retaining the prior one on failure.
 
     Readers must hold the shared catalog lock for the whole snapshot read.
@@ -279,5 +277,5 @@ def update_catalog(data_dir, opener=urllib.request.urlopen, only_if_missing=Fals
             marker = temp_path / "catalog.json"
             marker.write_text(json.dumps({"snapshot": name}), encoding="utf-8")
             os.replace(marker, root / "catalog.json")
-            _cleanup_snapshots(root, {name, previous.name if previous else name})
+            _cleanup_snapshots(root, {name, previous.name if previous else name}, remove_directory)
             return len(paths)

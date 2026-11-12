@@ -1,4 +1,5 @@
 import io
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -32,7 +33,7 @@ class MappingTests(unittest.TestCase):
         with zipfile.ZipFile(buffer, "w") as archive:
             archive.writestr("root/a.png", b"image")
         with tempfile.TemporaryDirectory() as root:
-            update_catalog(root, lambda request, timeout: io.BytesIO(buffer.getvalue()))
+            update_catalog(root, lambda request, timeout: io.BytesIO(buffer.getvalue()), remove_directory=shutil.rmtree)
             calls = []
             rows = [
                 {"channel": "1", "logo": "a.png"},

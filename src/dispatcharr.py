@@ -26,7 +26,6 @@ def assign_logo(channel_id, relative, image, logo_dir=LOGO_DIR):
         raise ValueError("Invalid channel ID") from None
 
     logo_dir = Path(logo_dir)
-    logo_dir.mkdir(parents=True, exist_ok=True)
     # Prefix prevents collisions with uploads and the path hash supports shared logos.
     digest = hashlib.sha256(relative.encode("utf-8")).hexdigest()
     extension = image.suffix.lower()
@@ -51,20 +50,6 @@ def assign_logo(channel_id, relative, image, logo_dir=LOGO_DIR):
         else:
             channel.logo = logo
             channel.save(update_fields=["logo"])
-
-
-def get_plugin_state(code_dir):
-    """Find loader-owned persistent storage and saved mappings for this install."""
-    from apps.plugins.loader import normalize_plugin_key
-    from apps.plugins.models import PluginConfig
-    from apps.plugins.sandbox import stable_plugin_data_path
-
-    key = normalize_plugin_key(Path(code_dir).name)
-    config = PluginConfig.objects.filter(key=key).first()
-    storage_key = (config.slug or config.key) if config else key
-    path = stable_plugin_data_path(key, str(code_dir), storage_key)
-    settings = (config.settings or {}) if config else {}
-    return path, settings
 
 
 def channel_options():
@@ -178,7 +163,7 @@ def ignore_latest_skipped(code_dir):
     return {"status": "ok", "message": f"Added {len(added)} channels to the ignore list. Reload the plugin and reopen settings before editing the list."}
 
 
-def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected, identity, image):
+def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected, identity, image, assign=None):
     """Recheck saved settings and effective values in the assignment transaction."""
     from django.db import transaction
     from apps.channels.models import Channel, ChannelGroup, ChannelOverride
@@ -228,5 +213,5 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
             return "channel_changed"
         if effective("logo_id") is not None and not expected["replace"]:
             return "existing_logo"
-        assign_logo(channel_id, identity, image)
+        (assign or assign_logo)(channel_id, identity, image)
         return None

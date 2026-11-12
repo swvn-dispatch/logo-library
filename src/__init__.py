@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 
-from .dispatcharr import (assign_logo, automatic_channels, channel_options, get_plugin_state,
+from .dispatcharr import (assign_logo, automatic_channels, channel_options,
                           group_options, guarded_assign_logo, ignore_latest_skipped, store_skipped_ids)
 from .automatic_run import run_automatic
 from .automatic import configuration_snapshot
@@ -24,18 +24,20 @@ class Plugin:
     help_url = _MANIFEST["help_url"]
     actions = _MANIFEST["actions"]
 
-    @property
-    def fields(self):
-        data_dir, settings = get_plugin_state(Path(__file__).parent)
-        return make_fields(data_dir, settings, channel_options(), group_options())
+    def get_fields(self, context):
+        return make_fields(context["data_dir"], context["settings"], channel_options(), group_options())
 
     def on_leader_acquired(self, context):
         for catalog in catalogs.CATALOGS:
             catalog.on_leader_acquired(context)
 
     def run(self, action, params, context):
+        def assign(channel, identity, image):
+            logo_dir = context["dispatcharr"]["ensure_directory"]("logos")
+            return assign_logo(channel, identity, image, logo_dir)
+
         if action == "ignore_skipped":
-            return ignore_latest_skipped(Path(__file__).parent)
+            return ignore_latest_skipped(context["code_dir"])
         if action == "run_automatic":
             options = group_options()
             groups = [option["value"] for option in options]
@@ -44,7 +46,7 @@ class Plugin:
             configuration = configuration_snapshot(settings, options, channels)
             result = run_automatic(context["data_dir"], settings, channels,
                                    groups, catalogs.CATALOGS,
-                                   lambda *args: guarded_assign_logo(Path(__file__).parent, *args))
+                                   lambda *args: guarded_assign_logo(context["code_dir"], *args, assign=assign))
             status = "partial" if result["skipped"] or result["failed"] or result["configuration_errors"] else "ok"
             message = (f"Applied {result['applied']}, manual mappings preserved {result.get('preserved', 0)}, "
                        f"ignored {result.get('ignored', 0)}, skipped {result['skipped']}, failed {result['failed']}.")
@@ -53,7 +55,7 @@ class Plugin:
             if generic_count:
                 message += f" Generic network logos applied: {generic_count}."
             skipped_ids = [item["channel"] for item in result["channels"] if item["status"] in {"skipped", "failed"}]
-            reference = store_skipped_ids(Path(__file__).parent, skipped_ids) if skipped_ids else None
+            reference = store_skipped_ids(context["code_dir"], skipped_ids) if skipped_ids else None
             numbers = {str(channel["id"]): channel.get("number") for channel in channels}
             for item in result["channels"]:
                 item["channel"] = numbers.get(str(item["channel"]))
@@ -75,7 +77,7 @@ class Plugin:
                 logger.warning("Could not retrieve channel numbers for Manual Match results", exc_info=True)
                 channels = []
             configuration = configuration_snapshot(settings, options, channels)
-            result = apply_mappings(context["data_dir"], settings.get("mappings", []), assign_logo)
+            result = apply_mappings(context["data_dir"], settings.get("mappings", []), assign)
             status = "partial" if result["skipped"] else "ok"
             channel_by_id = {str(channel["id"]): channel for channel in channels}
             for error in result["errors"]:

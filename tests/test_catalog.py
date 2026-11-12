@@ -1,6 +1,7 @@
 import io
 from concurrent.futures import ThreadPoolExecutor
 import os
+import shutil
 from pathlib import Path
 import stat
 import tempfile
@@ -10,9 +11,13 @@ import zipfile
 
 from src.catalogs.tv_logos.catalog import (
     INDEX_NAME, CatalogError, current_catalog, ensure_index, logo_paths, read_index,
-    release_initialization, reserve_initialization, resolve_logo, update_catalog,
+    release_initialization, reserve_initialization, resolve_logo, update_catalog as _update_catalog,
 )
 from src.catalogs.tv_logos import TvLogosCatalog
+
+
+def update_catalog(*args, **kwargs):
+    return _update_catalog(*args, **kwargs, remove_directory=shutil.rmtree)
 
 
 def archive(files):
@@ -148,10 +153,15 @@ class CatalogTests(unittest.TestCase):
     def test_keeps_current_and_previous_owned_snapshots_only(self):
         with tempfile.TemporaryDirectory() as root:
             paths = []
+            removed = []
+            def remove_directory(path):
+                removed.append(path)
+                shutil.rmtree(path)
             for i in range(3):
-                update_catalog(root, opener(archive([("root/a.png", str(i).encode())])))
+                _update_catalog(root, opener(archive([("root/a.png", str(i).encode())])), remove_directory=remove_directory)
                 paths.append(current_catalog(root))
             self.assertFalse(paths[0].exists())
+            self.assertEqual(removed, [paths[0]])
             self.assertTrue(paths[1].exists())
             self.assertEqual((paths[2] / "a.png").read_bytes(), b"2")
 

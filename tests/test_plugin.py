@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,6 +14,32 @@ from test_catalog import archive, opener
 
 
 class PluginTests(unittest.TestCase):
+    def test_fields_use_discovery_context_without_creating_data_dir(self):
+        with tempfile.TemporaryDirectory() as root:
+            data_dir = Path(root) / "not-created"
+            settings = {"automatic_ignored_channels": ["7"]}
+            with patch("src.channel_options", return_value=[]), patch("src.group_options", return_value=[]):
+                fields = Plugin().get_fields({"data_dir": str(data_dir), "settings": settings})
+            self.assertFalse(data_dir.exists())
+            ignored = next(field for field in fields if field["id"] == "automatic_ignored_channels")
+            self.assertEqual(ignored["default"], ["7"])
+
+    def test_automatic_assignment_uses_context_paths_and_host_directory(self):
+        report = {"applied": 1, "skipped": 0, "failed": 0, "configuration_errors": [], "channels": []}
+        def run(data_dir, settings, channels, groups, catalogs, assign):
+            assign("1", "2", "Example", None, {}, "tv_logos:a.png", Path("/image"))
+            return report
+        ensure = unittest.mock.Mock(return_value="/host/logos")
+        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[]), \
+             patch("src.run_automatic", side_effect=run), patch("src.guarded_assign_logo") as guard, \
+             patch("src.assign_logo") as assign:
+            Plugin().run("run_automatic", {}, {"data_dir": "/stable", "code_dir": "/installed/code", "settings": {},
+                                               "dispatcharr": {"ensure_directory": ensure}})
+            self.assertEqual(guard.call_args.args[0], "/installed/code")
+            guard.call_args.kwargs["assign"]("1", "tv_logos:a.png", Path("/image"))
+        ensure.assert_called_once_with("logos")
+        assign.assert_called_once_with("1", "tv_logos:a.png", Path("/image"), "/host/logos")
+
     def test_manifest_contract(self):
         manifest = json.loads((Path(__file__).parents[1] / "src" / "plugin.json").read_text())
         self.assertEqual(manifest["manifest_version"], 2)
@@ -218,10 +245,11 @@ class PluginTests(unittest.TestCase):
         catalog = TvLogosCatalog()
         calls = []
         with tempfile.TemporaryDirectory() as root:
-            update_catalog(root, opener(archive([("root/a.png", b"image")])))
+            update_catalog(root, opener(archive([("root/a.png", b"image")])), remove_directory=shutil.rmtree)
             snapshot = current_catalog(root)
             (snapshot / INDEX_NAME).unlink()
-            context = {"data_dir": root, "dispatch_task": lambda *args: calls.append(args)}
+            context = {"data_dir": root, "dispatch_task": lambda *args: calls.append(args),
+                       "dispatcharr": {"remove_directory": shutil.rmtree}}
             catalog.on_leader_acquired(context)
             catalog.on_leader_acquired(context)
             self.assertEqual(len(calls), 1)
@@ -260,7 +288,8 @@ class PluginTests(unittest.TestCase):
                     "automatic_ignored_channels": ["1"]}
         with patch("src.group_options", return_value=[]), \
              patch("src.apply_mappings", return_value={"applied": 1, "skipped": 0, "errors": []}) as apply:
-            result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings})
+            result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings,
+                                   "dispatcharr": {"ensure_directory": lambda name: "/logos"}})
         self.assertEqual(result["status"], "ok")
         self.assertEqual(apply.call_args.args[1], settings["mappings"])
 
@@ -278,10 +307,11 @@ class PluginTests(unittest.TestCase):
                     "automatic_ignored_channels": ["1"]}
         with patch("src.group_options", return_value=[]), patch("src.assign_logo") as assign, \
              patch("src.catalogs.CATALOGS", (Catalog(),)):
-            result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings})
+            result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings,
+                                   "dispatcharr": {"ensure_directory": lambda name: "/logos"}})
         self.assertEqual(result["applied"], 1)
         self.assertEqual(result["status"], "ok")
-        assign.assert_called_once_with("1", "tv_logos:logo.png", Path("/catalog/logo.png"))
+        assign.assert_called_once_with("1", "tv_logos:logo.png", Path("/catalog/logo.png"), "/logos")
 
     def test_automatic_action_reports_details(self):
         report = {"applied": 0, "skipped": 1, "failed": 0, "configuration_errors": [],
@@ -289,7 +319,7 @@ class PluginTests(unittest.TestCase):
         with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[{"id": 1, "number": "42", "name": "Test"}]), \
              patch("src.store_skipped_ids", return_value="a" * 32), \
              patch("src.run_automatic", return_value=report):
-            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "code_dir": "/plugin", "settings": {}})
         self.assertEqual(result["status"], "partial")
         self.assertEqual(result["message"], "Applied 0, manual mappings preserved 0, ignored 0, skipped 1, failed 0.")
         self.assertEqual(result["channels"][0]["channel"], "42")
@@ -313,7 +343,7 @@ class PluginTests(unittest.TestCase):
                                for c in channels]}
         with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=channels), \
              patch("src.store_skipped_ids", return_value="a" * 32) as store, patch("src.run_automatic", return_value=report):
-            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {"automatic_ignored_channels": ["101"]}})
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "code_dir": "/plugin", "settings": {"automatic_ignored_channels": ["101"]}})
         self.assertEqual([row["channel"] for row in result["channels"]], ["7", "7", None])
         self.assertEqual(store.call_args.args[1], ["101", "202", "303"])
         self.assertEqual(result["configuration"]["ignored_channels"], [{"number": "7", "name": "A"}])
@@ -440,10 +470,10 @@ class PluginTests(unittest.TestCase):
 
     def test_catalog_action_is_routed_to_catalog(self):
         with patch("src.catalogs.tv_logos.update_catalog", return_value=3) as update:
-            result = Plugin().run("update_catalog", {}, {"data_dir": "/test"})
+            result = Plugin().run("update_catalog", {}, {"data_dir": "/test", "dispatcharr": {"remove_directory": shutil.rmtree}})
         self.assertEqual(result["status"], "ok")
         self.assertIn("3", result["message"])
-        update.assert_called_once_with("/test")
+        update.assert_called_once_with("/test", remove_directory=shutil.rmtree)
 
     def test_options_include_multiple_catalog_namespaces(self):
         class Catalog:

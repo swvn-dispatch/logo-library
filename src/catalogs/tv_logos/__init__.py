@@ -41,12 +41,12 @@ class TvLogosCatalog:
         try:
             if params.get("initial"):
                 if current_catalog(data_dir) is None:
-                    update_catalog(data_dir, only_if_missing=True)
+                    update_catalog(data_dir, only_if_missing=True, remove_directory=context["dispatcharr"]["remove_directory"])
                 count = ensure_index(data_dir)
                 if count is None:
                     raise ValueError("TV Logos catalog is unavailable")
                 return {"status": "ok", "message": f"TV Logos library ready with {count} images. Reload the plugin before editing mappings."}
-            count = update_catalog(data_dir)
+            count = update_catalog(data_dir, remove_directory=context["dispatcharr"]["remove_directory"])
             return {"status": "ok", "message": f"Downloaded {count} TV Logos images. Reload the plugin before editing mappings."}
         finally:
             release_initialization(data_dir, params.get("request_token"))
