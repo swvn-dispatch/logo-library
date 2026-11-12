@@ -58,15 +58,17 @@ Python regex. Avoid regex patterns with excessive backtracking, which can stall
 the matching task. The fuzzy threshold defaults to 90 percent; a match must
 score above it. Similarity is not a probability that a logo is correct.
 
-Logo variant preference can prefer a standard or HD logo within a recognized
-variant family. Prefer HD falls back to a standard logo when no HD variant is
-available. Multiple HD variants or other unresolved ties are skipped.
+Logo variant preference defaults to Prefer standard and can instead prefer an HD
+logo within a recognized variant family. Prefer HD falls back to a standard logo
+when no HD variant is available. Multiple HD variants or other unresolved ties
+are skipped.
 
-**Use channel TVG ID as a station hint** and **Allow generic network logos** are
-off by default. The station hint reads the channel's TVG ID, using its override
-when set, not the matched EPG entry. TVG IDs may be stale and cannot verify a
+**Use channel TVG ID as a station hint** is off by default. The station hint reads
+the channel's TVG ID, using its override when set, not the matched EPG entry.
+TVG IDs may be stale and cannot verify a
 station's city. A generic network logo is a substitute, not a confirmed
-station-specific logo.
+station-specific logo. **Allow generic network logos** is on by default; disable
+it to avoid substituting a generic logo for a station.
 
 ## Manual assignment
 

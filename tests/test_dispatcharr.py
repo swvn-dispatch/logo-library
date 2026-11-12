@@ -63,7 +63,7 @@ class DispatcharrTests(unittest.TestCase):
     def test_guard_rechecks_current_settings_and_effective_values(self):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
         expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
-                    "prefix": "", "prefix_mode": "literal", "variant": "strict", "generic_fallback": False,
+                    "prefix": "", "prefix_mode": "literal", "variant": "standard", "generic_fallback": True,
                     "guide_signals": False, "threshold": 90, "catalog_filters": []}
         plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
         plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
@@ -113,10 +113,10 @@ class DispatcharrTests(unittest.TestCase):
             settings["automatic_prefix"] = "US:"
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("automatic_prefix")
-            settings["automatic_variant"] = "standard"
+            settings["automatic_variant"] = "strict"
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("automatic_variant")
-            settings["automatic_generic_fallback"] = True
+            settings["automatic_generic_fallback"] = False
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("automatic_generic_fallback")
             settings["catalog_filters"] = [{"mode": "exclude_contains", "text": "abc"}]

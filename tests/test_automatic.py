@@ -4,6 +4,17 @@ from src.automatic import compile_groups
 
 
 class AutomaticGroupTests(unittest.TestCase):
+    def test_default_preferences_and_explicit_overrides(self):
+        rows = [{"group": "1", "strategy": "exact"}]
+        groups, errors = compile_groups(rows, [1], {"tv"})
+        self.assertEqual(errors, [])
+        self.assertEqual(groups["1"]["variant"], "standard")
+        self.assertTrue(groups["1"]["generic_fallback"])
+        groups, errors = compile_groups(rows, [1], {"tv"}, {"automatic_variant": "strict", "automatic_generic_fallback": False})
+        self.assertEqual(errors, [])
+        self.assertEqual(groups["1"]["variant"], "strict")
+        self.assertFalse(groups["1"]["generic_fallback"])
+
     def test_hd_variant_preference_is_valid(self):
         groups, errors = compile_groups([{"group": "1", "strategy": "exact"}], [1], {"tv"}, {"automatic_variant": "hd"})
         self.assertEqual(errors, [])

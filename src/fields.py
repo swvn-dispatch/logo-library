@@ -171,13 +171,13 @@ def make_fields(data_dir, settings, channels, groups=()):
          "label": "Fuzzy threshold (%)", "default": 90,
          "description": "Used by all Standard + fuzzy groups. Scores must be strictly above this value; 100 cannot match."},
         {"id": "automatic_variant", "type": "select", "section": "automatic_advanced",
-         "label": "Logo variant preference", "default": "strict", "options": [
+          "label": "Logo variant preference", "default": "standard", "options": [
              {"value": "strict", "label": "Skip ambiguous variants"},
               {"value": "standard", "label": "Prefer standard variant"},
               {"value": "hd", "label": "Prefer HD variant"}],
           "description": "Preferences apply only within one recognized HD or horizontal variant family. Prefer HD falls back to a standard logo when no HD variant is available. Unresolved ties are skipped."},
         {"id": "automatic_generic_fallback", "type": "boolean", "section": "automatic_advanced",
-         "label": "Allow generic network logos", "default": False,
+          "label": "Allow generic network logos", "default": True,
          "description": "For unmatched channels with an explicit station call sign, allow an exact network name to stand in for the station. This may assign the same network logo to multiple cities; manual mappings still take priority."},
         {"id": "automatic_guide_signals", "type": "boolean", "section": "automatic_advanced",
           "label": "Use channel TVG ID as a station hint", "default": False,
