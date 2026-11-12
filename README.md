@@ -69,9 +69,9 @@ the matching task. The fuzzy threshold defaults to 90 percent; a match must
 score above it. Similarity is not a probability that a logo is correct.
 
 Logo variant preference defaults to Prefer standard and can instead prefer an HD
-logo within a recognized variant family. Prefer HD falls back to a standard logo
-when no HD variant is available. Multiple HD variants or other unresolved ties
-are skipped.
+logo within a recognized variant family. Prefer HD chooses the HD logo with the
+fewest additional recognized variant attributes, or a standard logo when no HD
+variant is available. Remaining ties are skipped.
 
 **Use channel TVG ID as a station hint** is off by default. The station hint reads
 the channel's TVG ID, using its override when set, not the matched EPG entry.

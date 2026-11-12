@@ -5,6 +5,7 @@ from src.fuzzy_matching import match_fuzzy
 from src.name_matching import build_name_index, match_name
 from src.variants import select_variant
 from src.candidates import candidate_details
+from src.matching_engine import match_channel
 
 
 class VariantTests(unittest.TestCase):
@@ -25,6 +26,22 @@ class VariantTests(unittest.TestCase):
         self.assertIsNone(select_variant([base, hd, second_hd], "hd", "tv_logos"))
         self.assertIsNone(select_variant([base, hd, unrelated], "hd", "tv_logos"))
         self.assertIsNone(select_variant([base, hd], "hd", "other"))
+
+    def test_hd_preference_uses_fewest_additional_attributes(self):
+        root = "countries/united-kingdom/"
+        base = root + "sky-sports-f1-uk.png"
+        regular_hd = root + "hd/sky-sports-f1-hd-uk.png"
+        horizontal_hd = root + "hd/sky-sports-f1-hd-hz-uk.png"
+        horizontal = root + "sky-sports-f1-hz-uk.png"
+        self.assertEqual(select_variant([base, regular_hd, horizontal_hd, horizontal], "hd", "tv_logos"), regular_hd)
+        self.assertEqual(select_variant([base, horizontal_hd], "hd", "tv_logos"), horizontal_hd)
+        self.assertIsNone(select_variant([regular_hd, root + "sky-sports-f1-hd-uk.png", horizontal_hd], "hd", "tv_logos"))
+        self.assertIsNone(select_variant([base, regular_hd, root + "sky-sports-f1-white-uk.png"], "hd", "tv_logos"))
+        index = build_name_index([base, regular_hd, horizontal_hd, horizontal], "tv_logos")
+        self.assertEqual(match_name("Sky Sports F1", index, variant="hd", catalog_id="tv_logos")["path"], regular_hd)
+        config = {"prefix": "", "prefix_mode": "literal", "variant": "hd", "strategy": "exact"}
+        result = match_channel("UK | Sky Sports F1", config, index, {}, "tv_logos")
+        self.assertEqual((result["path"], result["method"]), (regular_hd, "name_segment"))
 
     def test_standard_preference_requires_one_recognized_family(self):
         base = "countries/united-kingdom/bbc-one-uk.png"

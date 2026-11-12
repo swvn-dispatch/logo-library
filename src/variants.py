@@ -28,8 +28,10 @@ def select_variant(paths, preference="strict", catalog_id=None):
     if len({family for _, family, _ in classified}) != 1:
         return None
     if preference == "hd":
-        hd = [path for path, _, variants in classified if "hd" in variants]
+        hd = [(path, len(variants - {"hd"})) for path, _, variants in classified if "hd" in variants]
         if hd:
-            return hd[0] if len(hd) == 1 else None
+            fewest = min(extra for _, extra in hd)
+            preferred = [path for path, extra in hd if extra == fewest]
+            return preferred[0] if len(preferred) == 1 else None
     standards = [path for path, _, variant in classified if not variant]
     return standards[0] if len(standards) == 1 else None

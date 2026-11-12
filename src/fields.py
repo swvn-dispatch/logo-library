@@ -175,7 +175,7 @@ def make_fields(data_dir, settings, channels, groups=()):
              {"value": "strict", "label": "Skip ambiguous variants"},
               {"value": "standard", "label": "Prefer standard variant"},
               {"value": "hd", "label": "Prefer HD variant"}],
-          "description": "Preferences apply only within one recognized HD or horizontal variant family. Prefer HD falls back to a standard logo when no HD variant is available. Unresolved ties are skipped."},
+          "description": "Preferences apply only within one recognized variant family. Prefer HD chooses the HD logo with the fewest additional variant attributes, or a standard logo if no HD variant is available. Unresolved ties are skipped."},
         {"id": "automatic_generic_fallback", "type": "boolean", "section": "automatic_advanced",
           "label": "Allow generic network logos", "default": True,
          "description": "For unmatched channels with an explicit station call sign, allow an exact network name to stand in for the station. This may assign the same network logo to multiple cities; manual mappings still take priority."},
