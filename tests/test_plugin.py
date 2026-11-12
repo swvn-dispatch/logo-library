@@ -65,7 +65,7 @@ class PluginTests(unittest.TestCase):
         self.assertIn("possible false matches", by_id["automatic_skipped_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
-        self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic matching - Advanced")
+        self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic assignment - Advanced")
         self.assertNotIn("automatic_prefix_rules", by_id)
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
                          ["group", "strategy", "scope", "replace"])

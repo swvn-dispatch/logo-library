@@ -72,9 +72,9 @@ so a high score does not guarantee a correct logo.
 If an existing row shows **Standard (legacy station hint)**, it uses the same
 matching checks as Standard. You can change it to Standard when editing the row.
 
-## Automatic matching - Advanced
+## Automatic assignment - Advanced
 
-The collapsed **Automatic matching - Advanced** controls apply to all configured groups.
+The collapsed **Automatic assignment - Advanced** controls apply to all configured groups.
 Start with the defaults and change them deliberately:
 
 - **Logo variant preference:** The default, **Skip ambiguous variants**, is

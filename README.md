@@ -52,7 +52,7 @@ configuration error rather than a series of misleading `no_match` results.
 Select **Entire catalog**, or leave the scope blank, to search all logos that
 pass the catalog filters.
 
-The collapsed **Automatic matching - Advanced** section contains optional prefix, fuzzy
+The collapsed **Automatic assignment - Advanced** section contains optional prefix, fuzzy
 threshold and variant controls. The shared prefix may be literal or Python
 regex; regex is matched only at the beginning of the channel name. Avoid
 expressions with excessive backtracking, which can stall the matching task.

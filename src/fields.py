@@ -124,7 +124,7 @@ def make_fields(data_dir, settings, channels, groups=()):
              {"id": "scope", "label": "Path scope", "type": "select", "options": scope_options},
              {"id": "replace", "label": "Replace", "type": "boolean"},
          ]},
-        {"id": "automatic_advanced", "type": "section", "label": "Automatic matching - Advanced", "collapsed": True},
+        {"id": "automatic_advanced", "type": "section", "label": "Automatic assignment - Advanced", "collapsed": True},
         {"id": "automatic_prefix", "type": "string", "section": "automatic_advanced",
          "label": "Name prefix to remove", "default": "",
          "description": "Optional prefix removed from the start of channel names."},
