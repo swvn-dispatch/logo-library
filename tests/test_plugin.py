@@ -118,6 +118,7 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["automatic_threshold"]["default"], 90)
         self.assertEqual(by_id["automatic_groups"]["columns"][-1]["label"], "Replace")
         self.assertEqual(by_id["automatic_variant"]["default"], "strict")
+        self.assertIn({"value": "hd", "label": "Prefer HD variant"}, by_id["automatic_variant"]["options"])
         self.assertFalse(by_id["automatic_generic_fallback"]["default"])
         self.assertFalse(by_id["automatic_guide_signals"]["default"])
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])

@@ -4,6 +4,11 @@ from src.automatic import compile_groups
 
 
 class AutomaticGroupTests(unittest.TestCase):
+    def test_hd_variant_preference_is_valid(self):
+        groups, errors = compile_groups([{"group": "1", "strategy": "exact"}], [1], {"tv"}, {"automatic_variant": "hd"})
+        self.assertEqual(errors, [])
+        self.assertEqual(groups["1"]["variant"], "hd")
+
     def test_valid_settings_and_disabled_default(self):
         rows = [{"group": "1", "strategy": "fuzzy", "catalog": "tv", "scope": "countries/us/",
                  "threshold": 90, "replace": True}, {"group": "2"}]

@@ -127,7 +127,7 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
                 except re.error as exc:
                     raise ValueError(f"Invalid prefix regex: {exc}") from exc
             variant = settings.get("automatic_variant", "strict") or "strict"
-            if variant not in {"strict", "standard"}:
+            if variant not in {"strict", "standard", "hd"}:
                 raise ValueError("Unknown variant preference")
             generic = settings.get("automatic_generic_fallback", False)
             if not isinstance(generic, bool):

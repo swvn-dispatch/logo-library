@@ -58,6 +58,10 @@ Python regex. Avoid regex patterns with excessive backtracking, which can stall
 the matching task. The fuzzy threshold defaults to 90 percent; a match must
 score above it. Similarity is not a probability that a logo is correct.
 
+Logo variant preference can prefer a standard or HD logo within a recognized
+variant family. Prefer HD falls back to a standard logo when no HD variant is
+available. Multiple HD variants or other unresolved ties are skipped.
+
 **Use guide IDs as a station hint** and **Allow generic network logos** are off
 by default. Guide IDs may be stale and cannot verify a station's city. A generic
 network logo is a substitute, not a confirmed station-specific logo.

@@ -7,6 +7,18 @@ from src.variants import select_variant
 
 
 class VariantTests(unittest.TestCase):
+    def test_hd_preference_and_conservative_fallback(self):
+        base = "countries/united-kingdom/bbc-one-uk.png"
+        hd = "countries/united-kingdom/hd/bbc-one-hd-uk.png"
+        horizontal = "countries/united-kingdom/bbc-one-hz-uk.png"
+        second_hd = "countries/united-kingdom/bbc-one-hd-uk.png"
+        unrelated = "countries/united-kingdom/bbc-two-hd-uk.png"
+        self.assertEqual(select_variant([base, hd, horizontal], "hd", "tv_logos"), hd)
+        self.assertEqual(select_variant([base, horizontal], "hd", "tv_logos"), base)
+        self.assertIsNone(select_variant([base, hd, second_hd], "hd", "tv_logos"))
+        self.assertIsNone(select_variant([base, hd, unrelated], "hd", "tv_logos"))
+        self.assertIsNone(select_variant([base, hd], "hd", "other"))
+
     def test_standard_preference_requires_one_recognized_family(self):
         base = "countries/united-kingdom/bbc-one-uk.png"
         hd = "countries/united-kingdom/hd/bbc-one-hd-uk.png"
@@ -24,6 +36,8 @@ class VariantTests(unittest.TestCase):
         self.assertEqual(match_name("GB: BBC One", index, prefix, "regex")["reason"], "ambiguous")
         self.assertEqual(match_name("GB: BBC One", index, prefix, "regex", "standard", "tv_logos")["path"], paths[0])
         self.assertEqual(match_fuzzy("UK | BBC One", index, 80, prefix, "regex", "standard", "tv_logos")["path"], paths[0])
+        self.assertEqual(match_name("GB: BBC One", index, prefix, "regex", "hd", "tv_logos")["path"], paths[1])
+        self.assertEqual(match_fuzzy("UK | BBC One", index, 80, prefix, "regex", "hd", "tv_logos")["path"], paths[1])
         self.assertEqual(match_name("OTHER UK | BBC One", index, prefix, "regex", "standard", "tv_logos")["reason"], "no_match")
 
     def test_callsign_standard_preference_does_not_guess_between_stations(self):
