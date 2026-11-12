@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 import tempfile
 import unittest
+from contextlib import nullcontext
 from unittest.mock import patch
 
 from src import Plugin
@@ -14,6 +15,11 @@ from test_catalog import archive, opener
 
 
 class PluginTests(unittest.TestCase):
+    def setUp(self):
+        lock = patch("src.action_lock", return_value=nullcontext(True))
+        lock.start()
+        self.addCleanup(lock.stop)
+
     def test_fields_use_discovery_context_without_creating_data_dir(self):
         with tempfile.TemporaryDirectory() as root:
             data_dir = Path(root) / "not-created"
@@ -78,6 +84,8 @@ class PluginTests(unittest.TestCase):
             "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
+            "scheduled_tasks", "scheduled_tasks_help", "schedule_automatic_mode", "schedule_automatic_value",
+            "schedule_catalog_mode", "schedule_catalog_value",
         ])
         by_id = {field["id"]: field for field in fields}
         self.assertNotIn("section", by_id["instructions"])
@@ -108,6 +116,9 @@ class PluginTests(unittest.TestCase):
         self.assertFalse(by_id["automatic_generic_fallback"]["default"])
         self.assertFalse(by_id["automatic_guide_signals"]["default"])
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
+        self.assertTrue(by_id["scheduled_tasks"]["collapsed"])
+        self.assertEqual(by_id["schedule_automatic_mode"]["default"], "disabled")
+        self.assertEqual(by_id["schedule_catalog_mode"]["default"], "disabled")
         self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
         self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
         self.assertEqual(len(by_id["catalog_filters"]["columns"][0]["options"]), 8)

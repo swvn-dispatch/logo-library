@@ -11,6 +11,7 @@ from .automatic import configuration_snapshot
 from .fields import make_fields
 from .mappings import apply_mappings
 from . import catalogs
+from .scheduling import action_lock, run_service
 
 _MANIFEST = json.loads((Path(__file__).parent / "plugin.json").read_text(encoding="utf-8"))
 logger = logging.getLogger(__name__)
@@ -30,8 +31,20 @@ class Plugin:
     def on_leader_acquired(self, context):
         for catalog in catalogs.CATALOGS:
             catalog.on_leader_acquired(context)
+        if "start_service" in context:
+            context["start_service"](lambda stop: run_service(context, stop), name="scheduled-tasks")
+        else:
+            logger.warning("Scheduled tasks unavailable: Dispatcharr does not provide start_service")
 
     def run(self, action, params, context):
+        if action in {"run_automatic", "update_catalog"} and context.get("data_dir"):
+            with action_lock(context["data_dir"], action) as acquired:
+                if not acquired:
+                    return {"status": "error", "message": "This task is already running."}
+                return self._run(action, params, context)
+        return self._run(action, params, context)
+
+    def _run(self, action, params, context):
         def assign(channel, identity, image):
             logo_dir = context["dispatcharr"]["ensure_directory"]("logos")
             return assign_logo(channel, identity, image, logo_dir)

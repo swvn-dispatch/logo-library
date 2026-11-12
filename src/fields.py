@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 from . import catalogs
 from .filters import MATCH_TYPES, catalog_filter_rules, matches
 from .mappings import automatic_ignored_channels
+from .scheduling import parse_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,12 @@ def make_fields(data_dir, settings, channels, groups=()):
     scope_options.extend({"value": path, "label": f"Unavailable or filtered: {path}"}
                          for path in sorted(saved_scopes - directories))
     unavailable_groups = set()
+    schedule_errors = []
+    for key, label in (("automatic", "Auto Match"), ("catalog", "Catalog refresh")):
+        try:
+            parse_schedule(settings.get(f"schedule_{key}_mode", "disabled"), settings.get(f"schedule_{key}_value", ""))
+        except ValueError as exc:
+            schedule_errors.append(f"{label}: {exc}.")
     if isinstance(group_rows, list):
         for row in group_rows:
             if not isinstance(row, dict):
@@ -180,6 +187,15 @@ def make_fields(data_dir, settings, channels, groups=()):
                  {"value": f"{operation}_{kind}", "label": f"{operation.title()} {kind.replace('_', ' ')}"}
                  for operation in ("include", "exclude") for kind in MATCH_TYPES
              ]},
-             {"id": "text", "label": "Text", "type": "string"},
-         ]},
+              {"id": "text", "label": "Text", "type": "string"},
+          ]},
+        {"id": "scheduled_tasks", "type": "section", "label": "Scheduled Tasks", "collapsed": True},
+        {"id": "scheduled_tasks_help", "type": "info", "section": "scheduled_tasks",
+         "description": "Choose Disabled, Interval, or Cron for each task. Enter whole hours for Interval or five cron fields (minute hour day month weekday) for Cron. Cron uses UTC. Save settings to apply changes. Refresh does not run Auto Match."},
+        *([{"id": "scheduled_tasks_errors", "type": "info", "section": "scheduled_tasks", "label": "Schedule errors", "description": " ".join(schedule_errors)}] if schedule_errors else []),
+        *[field for key, label in (("automatic", "Auto Match"), ("catalog", "Catalog refresh")) for field in (
+            {"id": f"schedule_{key}_mode", "type": "select", "section": "scheduled_tasks", "label": f"{label} schedule", "default": "disabled", "options": [
+                {"value": "disabled", "label": "Disabled"}, {"value": "interval", "label": "Interval"}, {"value": "cron", "label": "Cron"}]},
+            {"id": f"schedule_{key}_value", "type": "string", "section": "scheduled_tasks", "label": f"{label} interval or cron", "default": "", "description": "Whole hours, or a five-field UTC cron expression."},
+        )],
     ]

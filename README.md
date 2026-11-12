@@ -25,7 +25,7 @@ This project is maintained in my spare time. If it's saved you some headaches, a
 
 ## Automatic assignment
 
-Auto Match runs only when requested, for groups with a valid enabled row. Start
+Auto Match runs when requested or scheduled, for groups with a valid enabled row. Start
 with **Standard**, which uses channel names and station information. **Standard
 + fuzzy** also considers similar names when stronger matches are unavailable.
 Review assignments, especially when using fuzzy matching.
@@ -89,6 +89,31 @@ the plugin and reopen its settings to refresh choices after changing filters or
 updating the catalog. Catalog updates do not automatically assign logos.
 Dispatcharr caches field options per process, so confirm that settings saved
 successfully after a reload.
+
+## Scheduled Tasks
+
+The collapsed **Scheduled Tasks** section below Catalog filters controls Auto
+Match and catalog refresh independently. Both are disabled by default. Select
+**Interval** and enter a whole number of hours from 1 to 87600, or select
+**Cron** and enter five fields: minute, hour, day of month, month and weekday.
+For example, `0 3 * * 0` runs at 03:00 on Sundays. Cron uses **UTC**, not the
+container timezone. Numeric fields, lists, ranges and steps are supported;
+weekday 0 or 7 is Sunday. When both day fields are restricted, either can
+match. Invalid schedules do not run and are reported in settings and logs.
+
+Save settings to apply a schedule. A new or changed interval starts counting
+from when the scheduler sees it; a new cron schedule waits for a later minute.
+Cron runs missed while the service is down are not replayed. An overdue interval
+runs once after the service resumes, then counts from that dispatch. Task
+history shows scheduled outcomes. Auto Match uses current saved settings and
+can replace logos where Replace is enabled. Catalog refresh does not run Auto
+Match or update copied logos, and choices still require a plugin reload.
+
+The scheduler stops when the plugin loses leadership or is disabled. A task
+already running is not stopped. Overlapping runs of the same action, including
+manual runs, are rejected. A claimed slot can be lost if the leader crashes
+between recording the claim and dispatching it; this avoids replaying the same
+slot after a handoff. Dispatch failures are logged and retried while due.
 
 ## Requirements
 
