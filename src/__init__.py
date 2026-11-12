@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from .dispatcharr import (assign_logo, automatic_channels, channel_options, get_plugin_state,
-                          group_options, guarded_assign_logo)
+                          group_options, guarded_assign_logo, ignore_latest_skipped)
 from .automatic_run import run_automatic
 from .automatic import configuration_snapshot
 from .fields import make_fields
@@ -34,6 +34,8 @@ class Plugin:
             catalog.on_leader_acquired(context)
 
     def run(self, action, params, context):
+        if action == "ignore_skipped":
+            return ignore_latest_skipped(Path(__file__).parent)
         if action == "run_automatic":
             options = group_options()
             groups = [option["value"] for option in options]

@@ -99,6 +99,43 @@ def automatic_channels():
             for channel in with_effective_values(Channel.objects.all())]
 
 
+def ignore_latest_skipped(code_dir):
+    """Merge the latest Auto Match's skipped and failed channels into saved settings."""
+    from django.db import transaction
+    from apps.plugins.loader import normalize_plugin_key
+    from apps.plugins.models import PluginConfig
+    from apps.plugins.task_history import get_task_history
+    from .mappings import automatic_ignored_channels
+
+    key = normalize_plugin_key(Path(code_dir).name)
+    history = get_task_history(key)
+    latest = next((item for item in history if item.get("action_id") == "run_automatic"), None)
+    if not latest or latest.get("status") == "running":
+        return {"status": "error", "message": "No completed Auto Match result is available. Run Auto Match first."}
+    result = latest.get("result")
+    if not isinstance(result, dict) or not isinstance(result.get("channels"), list):
+        return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
+    try:
+        values = [item["channel"] for item in result["channels"]
+                  if isinstance(item, dict) and item.get("status") in {"skipped", "failed"}]
+        selected = automatic_ignored_channels({"automatic_ignored_channels": values})
+    except (KeyError, ValueError):
+        return {"status": "error", "message": "The latest Auto Match contains invalid channel results."}
+    with transaction.atomic():
+        plugin = PluginConfig.objects.select_for_update().filter(key=key).first()
+        if plugin is None or not isinstance(plugin.settings, dict):
+            return {"status": "error", "message": "Saved plugin settings are unavailable."}
+        try:
+            existing = automatic_ignored_channels(plugin.settings)
+        except ValueError as exc:
+            return {"status": "error", "message": str(exc)}
+        added = selected - existing
+        if added:
+            plugin.settings = {**plugin.settings, "automatic_ignored_channels": sorted(existing | selected, key=int)}
+            plugin.save(update_fields=["settings"])
+    return {"status": "ok", "message": f"Added {len(added)} channels to the ignore list. Reload the plugin and reopen settings before editing the list."}
+
+
 def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected, identity, image):
     """Recheck saved settings and effective values in the assignment transaction."""
     from django.db import transaction
@@ -107,7 +144,7 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
     from apps.plugins.models import PluginConfig
     from . import catalogs
     from .automatic import compile_groups
-    from .mappings import manual_disposition
+    from .mappings import automatic_ignored_channels, manual_disposition
 
     with transaction.atomic():
         key = normalize_plugin_key(Path(code_dir).name)
@@ -118,7 +155,13 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
         mappings = settings.get("mappings", [])
         if not isinstance(mappings, list):
             return "settings_changed"
-        channel_rows = [row for row in mappings if isinstance(row, dict) and str(row.get("channel")) == channel_id]
+        try:
+            if channel_id in automatic_ignored_channels(settings):
+                return "ignored"
+        except ValueError:
+            return "settings_changed"
+        channel_rows = [row for row in mappings if isinstance(row, dict) and row.get("ignore") is not True
+                        and str(row.get("channel")) == channel_id]
         disposition = manual_disposition(channel_rows)
         if disposition:
             return disposition

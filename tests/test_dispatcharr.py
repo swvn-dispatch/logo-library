@@ -6,10 +6,40 @@ import types
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.dispatcharr import assign_logo, automatic_channels, channel_options, group_options, guarded_assign_logo
+from src.dispatcharr import assign_logo, automatic_channels, channel_options, group_options, guarded_assign_logo, ignore_latest_skipped
 
 
 class DispatcharrTests(unittest.TestCase):
+    def test_ignore_latest_skipped_merges_and_handles_missing_history(self):
+        plugin = MagicMock(settings={"mappings": [{"channel": "1", "ignore": True}]})
+        model = MagicMock()
+        model.objects.select_for_update.return_value.filter.return_value.first.return_value = plugin
+        db = types.ModuleType("django.db")
+        db.transaction = types.SimpleNamespace(atomic=lambda: nullcontext())
+        loader = types.ModuleType("apps.plugins.loader")
+        loader.normalize_plugin_key = lambda name: name
+        models = types.ModuleType("apps.plugins.models")
+        models.PluginConfig = model
+        history = types.ModuleType("apps.plugins.task_history")
+        history.get_task_history = MagicMock(return_value=[{"action_id": "run_automatic", "status": "partial", "result": {
+            "channels": [{"channel": "2", "status": "skipped"}, {"channel": "2", "status": "failed"},
+                         {"channel": "3", "status": "applied"}]}}])
+        modules = {"django": types.ModuleType("django"), "django.db": db, "apps": types.ModuleType("apps"),
+                   "apps.plugins": types.ModuleType("apps.plugins"), "apps.plugins.models": models,
+                   "apps.plugins.loader": loader, "apps.plugins.task_history": history}
+        with patch.dict(sys.modules, modules):
+            result = ignore_latest_skipped("/plugin")
+            self.assertEqual(plugin.settings["automatic_ignored_channels"], ["1", "2"])
+            self.assertIn("Reload the plugin", result["message"])
+            plugin.save.assert_called_once_with(update_fields=["settings"])
+            self.assertIn("Added 0", ignore_latest_skipped("/plugin")["message"])
+            plugin.settings["automatic_ignored_channels"] = "invalid"
+            self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
+            history.get_task_history.return_value[0]["status"] = "running"
+            self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
+            history.get_task_history.return_value = []
+            self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
+
     def test_automatic_channel_snapshot_uses_effective_values(self):
         row = types.SimpleNamespace(id=1, effective_name="Override", effective_channel_group_id=2, effective_logo_id=3, effective_tvg_id="ABC.us")
         models = types.ModuleType("apps.channels.models")
@@ -52,6 +82,12 @@ class DispatcharrTests(unittest.TestCase):
             self.assertEqual(guarded_assign_logo(*args), "manual_mapping")
             settings["mappings"] = [{"channel": "1", "ignore": True}]
             self.assertEqual(guarded_assign_logo(*args), "ignored")
+            settings["automatic_ignored_channels"] = ["1"]
+            settings["mappings"] = []
+            self.assertEqual(guarded_assign_logo(*args), "ignored")
+            settings["automatic_ignored_channels"] = "invalid"
+            self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+            settings.pop("automatic_ignored_channels")
             settings["mappings"] = [{"channel": "1"}]
             self.assertEqual(guarded_assign_logo(*args), "manual_mapping_incomplete")
             settings["mappings"] = []

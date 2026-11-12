@@ -5,6 +5,26 @@ from collections import Counter
 from . import catalogs
 
 
+def automatic_ignored_channels(settings):
+    """Return ignored IDs, retaining old checked rows until the list is saved."""
+    if "automatic_ignored_channels" not in settings:
+        rows = settings.get("mappings", [])
+        if not isinstance(rows, list):
+            raise ValueError("Mappings must be a list")
+        values = [row.get("channel") for row in rows if isinstance(row, dict)
+                  and row.get("ignore") is True and row.get("channel") not in (None, "")]
+    else:
+        values = settings["automatic_ignored_channels"]
+        if not isinstance(values, list):
+            raise ValueError("Channels to ignore must be a list")
+    result = set()
+    for value in values:
+        if isinstance(value, bool) or not isinstance(value, (str, int)) or not str(value).isascii() or not str(value).isdigit() or int(value) <= 0:
+            raise ValueError("Channels to ignore must contain valid channel IDs")
+        result.add(str(int(value)))
+    return result
+
+
 def manual_disposition(rows):
     """Classify saved rows for one channel without claiming a logo was applied."""
     if not rows:

@@ -5,6 +5,8 @@ from copy import deepcopy
 from pathlib import PurePosixPath
 import re
 
+from .mappings import automatic_ignored_channels
+
 
 def configuration_snapshot(settings, group_options):
     """Return matching configuration, with defaults and safe group labels."""
@@ -38,9 +40,14 @@ def configuration_snapshot(settings, group_options):
                    if isinstance(row, dict) else {"invalid": True} for row in filters]
     else:
         filters = "<invalid>"
+    try:
+        ignored = sorted(automatic_ignored_channels(settings), key=int)
+    except ValueError:
+        ignored = "<invalid>"
     return {
         "snapshot": "start_of_run",
         "groups": groups,
+        "ignored_channels": ignored,
         "advanced": {
             "prefix": scalar(settings.get("automatic_prefix", "")),
             "prefix_mode": scalar(settings.get("automatic_prefix_mode", "literal")),

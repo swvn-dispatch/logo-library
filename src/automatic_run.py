@@ -7,7 +7,7 @@ from .callsign_matching import build_callsign_index, build_station_name_index
 from .catalog_scope import scoped_paths
 from .filters import catalog_filter_rules, matches
 from .matching_engine import build_network_index, match_channel
-from .mappings import manual_disposition
+from .mappings import automatic_ignored_channels, manual_disposition
 from .name_matching import build_name_index
 
 
@@ -23,13 +23,21 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
         raise ValueError("Manual mappings must be a list")
     manual_rows = defaultdict(list)
     for row in manual:
-        if isinstance(row, dict) and row.get("channel") not in (None, ""):
+        # Old checked rows remain non-assigning in Manual Match until removed,
+        # but the new list is authoritative once it has been saved.
+        if isinstance(row, dict) and row.get("ignore") is not True and row.get("channel") not in (None, ""):
             manual_rows[str(row["channel"])].append(row)
     catalogs = tuple(catalogs)
     catalog_by_id = {catalog.id: catalog for catalog in catalogs}
     group_ids = {str(group) for group in group_ids}
     groups, errors = compile_groups(settings.get("automatic_groups", []), group_ids, catalog_by_id, settings)
     enabled_groups = dict(groups)
+    try:
+        ignored_channels = automatic_ignored_channels(settings)
+    except ValueError as exc:
+        ignored_channels = set()
+        errors.append(str(exc))
+        groups.clear()
     filter_rules, filter_errors = catalog_filter_rules(settings.get("catalog_filters", []), catalogs)
     if filter_errors:
         errors.extend(f"Catalog filter: {error}" for error in filter_errors)
@@ -57,13 +65,15 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
         group_id = str(channel["group_id"]) if channel.get("group_id") is not None else None
         config = groups.get(group_id)
         if config is None:
-            if channel_id not in manual_rows or group_id not in enabled_groups:
+            if (channel_id not in manual_rows and channel_id not in ignored_channels) or group_id not in enabled_groups:
                 continue
             config = enabled_groups[group_id]
         detail = {"channel": channel_id, "name": channel.get("name", ""), "group": group_id}
         try:
             if counts[channel_id] > 1:
                 reason = "duplicate_channel"
+            elif channel_id in ignored_channels:
+                reason = "ignored"
             elif channel_id in manual_rows:
                 reason = manual_disposition(manual_rows[channel_id])
             elif channel.get("logo_id") is not None and not config["replace"]:

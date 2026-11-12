@@ -23,6 +23,12 @@
       "async": true
     },
     {
+      "id": "ignore_skipped",
+      "label": "Ignore skipped and failed channels",
+      "description": "Add skipped and failed channels from the latest Auto Match to the ignore list.",
+      "button_label": "Add to ignore list"
+    },
+    {
       "id": "update_catalog",
       "label": "Refresh tv-logos",
       "description": "Download the latest tv-logos catalog.",

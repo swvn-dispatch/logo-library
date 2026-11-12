@@ -16,11 +16,15 @@ catalog does not run matching.
    catalog. Path choices come from its background-built index.
 3. For channels that need a particular logo, save rows under **Manual
    assignment**, then run **Manual Match**. Saved manual mappings take priority
-   over Auto Match, even if a mapping row is incomplete. To protect a channel
-   without assigning a logo, add its row and check **Ignore**; no logo selection
-   is needed.
+   over Auto Match, even if a mapping row is incomplete.
 4. Under **Automatic assignment**, add a row for one group. Choose a strategy
-   and path scope, leave **Replace** off, and save.
+   and path scope, leave **Replace** off, and save. Use **Channels to ignore**
+   below the group table to protect individual channels from Auto Match without
+   adding manual mappings.
+
+To ignore all skipped and failed channels from the latest Auto Match, run
+**Ignore skipped and failed channels**, then reload the plugin and reopen its
+settings before editing the list. This action requires an available task result.
 5. Run **Auto Match**, inspect its result, and review the channel logos. The
    action applies matches immediately; it is not a preview. Channels outside
    enabled group rows are omitted from its results.
@@ -107,12 +111,17 @@ skips channels with an existing effective logo. Before assigning, it rechecks th
 group, channel name, effective logo, and relevant saved settings. Conflicting
 evidence and unresolved ties are skipped.
 
-Auto Match reports complete manual rows as successfully preserved and Ignore
-rows as successfully ignored; neither makes the run partial. Preserved means
+Auto Match reports complete manual rows as successfully preserved and channels
+on the ignore list as successfully ignored; neither makes the run partial. Preserved means
 Auto Match did not change the channel, not that Manual Match has applied or
 verified the saved logo. Incomplete or duplicate manual rows are reported as
-problems and still protect the channel from automatic assignment. Manual Match
-does not assign a logo for an Ignore row, even if a logo remains selected.
+problems and still protect the channel from automatic assignment. The ignore list
+does not prevent Manual Match from applying an explicit manual mapping.
+
+If you used the former Ignore checkbox in a manual row, the channel remains
+ignored until you save the new ignore list. Select and save those channels in
+**Channels to ignore**, then remove their old manual rows. The old rows do not
+assign a logo, even if one remains selected.
 
 The selected scope and available catalog files determine what can be matched.
 Even a unique match can be wrong, especially with fuzzy matching, generic
@@ -120,7 +129,8 @@ network logos, or guide-ID hints. Review results before enabling replacement for
 more groups, and use manual mappings where a specific logo matters.
 
 The Manual Match and Auto Match result JSON includes the plugin version and a
-start-of-run snapshot of group settings, advanced settings, and catalog filters.
+start-of-run snapshot of group settings, ignored channel IDs, advanced settings,
+and catalog filters.
 This includes configured names, prefixes, regex rules, and filter text, so
 review the result before sharing it. Manual mappings and unrelated plugin
 settings are not included in that snapshot.

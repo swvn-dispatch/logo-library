@@ -65,13 +65,31 @@ class AutomaticRunTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_incomplete_duplicate_and_invalid_manual_rows_do_not_override_channels(self):
-        self.settings["mappings"] = [{"channel": "1"}, {"channel": "2", "ignore": True},
+        self.settings["mappings"] = [{"channel": "1"}, {"channel": "2", "logo": "b.png"},
                                      {"channel": "2", "logo": "a.png"}, {"channel": "3", "ignore": "yes"}]
         result = self.run_match([{"id": i, "group_id": 1, "name": "ABC"} for i in (1, 2, 3)])
         self.assertEqual([row["reason"] for row in result["channels"]],
                          ["manual_mapping_incomplete", "manual_mapping_conflict", "manual_mapping_invalid"])
         self.assertEqual(result["skipped"], 3)
         self.assertEqual(self.calls, [])
+
+    def test_auto_ignore_list_overrides_manual_and_legacy_rows(self):
+        self.settings["automatic_ignored_channels"] = ["1", "2"]
+        self.settings["mappings"] = [{"channel": "1", "logo": "a.png"},
+                                     {"channel": "3", "ignore": True}]
+        result = self.run_match([{"id": i, "group_id": 1, "name": "ABC"} for i in (1, 2, 3)])
+        self.assertEqual((result["ignored"], result["preserved"], result["applied"]), (2, 0, 1))
+        self.assertEqual([row.get("outcome") for row in result["channels"][:2]], ["ignored", "ignored"])
+        self.assertEqual(self.calls[0][0], "3")
+
+    def test_invalid_auto_ignore_list_fails_closed(self):
+        for value in ("1", [None], [True], ["not-an-id"], [0]):
+            with self.subTest(value=value):
+                self.settings["automatic_ignored_channels"] = value
+                result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+                self.assertEqual(result["applied"], 0)
+                self.assertIn("Channels to ignore", result["configuration_errors"][0])
+                self.assertEqual(self.calls, [])
 
     def test_manual_or_ignore_added_during_run_is_reported_as_success(self):
         def guard(channel, *args):

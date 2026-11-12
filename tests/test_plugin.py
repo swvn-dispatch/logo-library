@@ -16,14 +16,14 @@ class PluginTests(unittest.TestCase):
     def test_manifest_contract(self):
         manifest = json.loads((Path(__file__).parents[1] / "src" / "plugin.json").read_text())
         self.assertEqual(manifest["manifest_version"], 2)
-        self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes", "run_automatic"})
-        self.assertTrue(all(action["async"] for action in manifest["actions"]))
+        self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes", "run_automatic", "ignore_skipped"})
+        self.assertTrue(all(action.get("async") for action in manifest["actions"] if action["id"] != "ignore_skipped"))
         self.assertEqual(manifest["actions"][0]["id"], "apply_changes")
         manifest_actions = {action["id"]: action for action in manifest["actions"]}
         declared = catalog_actions()
         self.assertEqual(len({action["id"] for action in declared}), len(declared))
         self.assertNotIn("apply_changes", {action["id"] for action in declared})
-        self.assertEqual(set(manifest_actions) - {"apply_changes", "run_automatic"}, {action["id"] for action in declared})
+        self.assertEqual(set(manifest_actions) - {"apply_changes", "run_automatic", "ignore_skipped"}, {action["id"] for action in declared})
         for action in declared:
             self.assertEqual(manifest_actions[action["id"]], action)
         self.assertEqual(manifest_actions["update_catalog"]["button_color"], "teal")
@@ -45,8 +45,8 @@ class PluginTests(unittest.TestCase):
             fields = make_fields(root, {}, [])
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
-            "automatic_assignment", "automatic_setup_help", "automatic_scope_help", "automatic_replace_help",
-            "automatic_skipped_help", "automatic_groups", "automatic_advanced", "automatic_prefix",
+            "automatic_assignment", "automatic_setup_help", "automatic_group_help",
+            "automatic_groups", "automatic_ignored_channels", "automatic_advanced", "automatic_prefix",
             "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
@@ -56,13 +56,13 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["manual_assignment"]["type"], "section")
         self.assertEqual(by_id["manual_instructions"]["section"], "manual_assignment")
         self.assertEqual(by_id["mappings"]["section"], "manual_assignment")
-        self.assertEqual(by_id["mappings"]["columns"][-1], {"id": "ignore", "label": "Ignore", "type": "boolean"})
+        self.assertEqual([column["id"] for column in by_id["mappings"]["columns"]], ["channel", "logo"])
+        self.assertEqual(by_id["automatic_ignored_channels"]["type"], "multiselect")
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_setup_help"]["section"], "automatic_assignment")
-        self.assertIn("Groups without an enabled row are skipped", by_id["automatic_setup_help"]["description"])
-        self.assertIn("Catalog filters still apply", by_id["automatic_scope_help"]["description"])
-        self.assertIn("Saved manual mappings always take priority", by_id["automatic_replace_help"]["description"])
-        self.assertIn("possible false matches", by_id["automatic_skipped_help"]["description"])
+        self.assertIn("review the results for channels that were skipped or failed", by_id["automatic_setup_help"]["description"])
+        self.assertIn("Catalog filters still apply", by_id["automatic_group_help"]["description"])
+        self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_group_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
         self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic assignment - Advanced")
@@ -83,6 +83,20 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
         self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
         self.assertEqual(len(by_id["catalog_filters"]["columns"][0]["options"]), 8)
+
+    def test_legacy_ignored_channels_are_offered_for_migration(self):
+        settings = {"mappings": [{"channel": "1", "ignore": True}, {"channel": "9", "ignore": True}]}
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, settings, [{"value": "1", "label": "First"}])
+        by_id = {field["id"]: field for field in fields}
+        select = by_id["automatic_ignored_channels"]
+        self.assertEqual(select["default"], ["1", "9"])
+        self.assertIn({"value": "9", "label": "Missing channel (ID 9)"}, select["options"])
+        self.assertIn("First", by_id["manual_legacy_ignore"]["description"])
+        settings["automatic_ignored_channels"] = []
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, settings, [{"value": "1", "label": "First"}])
+        self.assertEqual(next(field for field in fields if field["id"] == "automatic_ignored_channels")["default"], [])
 
     def test_existing_prefix_rules_remain_editable(self):
         with tempfile.TemporaryDirectory() as root:
@@ -240,12 +254,32 @@ class PluginTests(unittest.TestCase):
 
     def test_manual_match_keeps_saved_mappings_despite_filters(self):
         settings = {"mappings": [{"channel": "1", "logo": "tv_logos:countries/us/a.png"}],
-                    "catalog_filters": [{"mode": "include_contains", "text": "canada"}]}
+                    "catalog_filters": [{"mode": "include_contains", "text": "canada"}],
+                    "automatic_ignored_channels": ["1"]}
         with patch("src.group_options", return_value=[]), \
              patch("src.apply_mappings", return_value={"applied": 1, "skipped": 0, "errors": []}) as apply:
             result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings})
         self.assertEqual(result["status"], "ok")
         self.assertEqual(apply.call_args.args[1], settings["mappings"])
+
+    def test_manual_match_can_assign_an_auto_ignored_channel(self):
+        from contextlib import nullcontext
+
+        class Catalog:
+            id = "tv_logos"
+            accepts_legacy_paths = True
+
+            def resolve(self, data_dir, path):
+                return nullcontext(Path("/catalog/logo.png"))
+
+        settings = {"mappings": [{"channel": "1", "logo": "tv_logos:logo.png"}],
+                    "automatic_ignored_channels": ["1"]}
+        with patch("src.group_options", return_value=[]), patch("src.assign_logo") as assign, \
+             patch("src.catalogs.CATALOGS", (Catalog(),)):
+            result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings})
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(result["status"], "ok")
+        assign.assert_called_once_with("1", "tv_logos:logo.png", Path("/catalog/logo.png"))
 
     def test_automatic_action_reports_details(self):
         report = {"applied": 0, "skipped": 1, "failed": 0, "configuration_errors": [],
@@ -309,6 +343,7 @@ class PluginTests(unittest.TestCase):
             "automatic_prefix": "CA |", "automatic_prefix_mode": "literal",
             "automatic_prefix_rules": [{"group": "1", "mode": "regex", "prefix": "^CA"}],
             "automatic_variant": "standard", "automatic_guide_signals": True,
+            "automatic_ignored_channels": ["7", "2"],
             "catalog_filters": [{"mode": "include_contains", "text": "canada"},
                                 {"mode": "exclude_regex", "text": "old", "catalog": "tv_logos"}],
             "mappings": [{"channel": "secret-channel", "logo": "secret-logo"}],
@@ -320,6 +355,7 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": settings})
         self.assertEqual(result["plugin_version"], Plugin.version)
         self.assertEqual(result["configuration"]["snapshot"], "start_of_run")
+        self.assertEqual(result["configuration"]["ignored_channels"], ["2", "7"])
         groups = result["configuration"]["groups"]
         self.assertEqual(groups[0], {"row": 1, "group": "1", "group_name": "Canadian locals",
                                      "strategy": "exact", "scope": "countries/canada", "replace": True})

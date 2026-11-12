@@ -5,6 +5,7 @@ from pathlib import PurePosixPath
 
 from . import catalogs
 from .filters import MATCH_TYPES, catalog_filter_rules, matches
+from .mappings import automatic_ignored_channels
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ def make_fields(data_dir, settings, channels, groups=()):
         except Exception:
             logger.exception("Catalog %s failed to list logos", catalog.id)
     channel_options = list(channels)
+    ignore_options = list(channel_options)
     channel_ids = {option["value"] for option in channel_options}
     logo_ids = {option["value"] for option in logo_options}
     rows = settings.get("mappings", [])
@@ -62,6 +64,17 @@ def make_fields(data_dir, settings, channels, groups=()):
             except ValueError:
                 label = f"Missing: {logo}"
             logo_options.append({"value": logo, "label": label})
+    try:
+        ignored_ids = sorted(automatic_ignored_channels(settings), key=int)
+    except ValueError:
+        ignored_ids = []
+    ignore_ids = {str(option["value"]) for option in ignore_options}
+    for channel_id in ignored_ids:
+        if channel_id not in ignore_ids:
+            ignore_options.append({"value": channel_id, "label": f"Missing channel (ID {channel_id})"})
+    channel_labels = {str(option["value"]): option["label"] for option in channel_options}
+    legacy_ignored = sorted({str(row["channel"]) for row in rows if isinstance(row, dict)
+                             and row.get("ignore") is True and row.get("channel") not in (None, "")})
     group_options = list(groups)
     group_ids = {option["value"] for option in group_options}
     group_rows = settings.get("automatic_groups", [])
@@ -88,26 +101,24 @@ def make_fields(data_dir, settings, channels, groups=()):
          "description": "After a catalog is downloaded, refreshed, or indexed, it is recommended to click Reload plugin."},
         {"id": "manual_assignment", "type": "section", "label": "Manual assignment", "collapsed": False},
         {"id": "manual_instructions", "type": "info", "section": "manual_assignment",
-         "description": "Save mappings before running Manual Match. Check Ignore to protect a channel from Auto Match without assigning a logo. Removing a row does not remove the assigned logo."},
+         "description": "Save mappings before running Manual Match. Removing a row does not remove the assigned logo."},
+        *([{"id": "manual_legacy_ignore", "type": "info", "section": "manual_assignment",
+            "label": "Previously ignored channels",
+            "description": "Save these channels in Channels to ignore under Automatic assignment, then remove their old manual rows: "
+            + ", ".join(channel_labels.get(channel, f"ID {channel}") for channel in legacy_ignored)
+            + ". Those old rows never assign a logo."}] if legacy_ignored else []),
         {"id": "mappings", "type": "table", "section": "manual_assignment", "label": "Channel logo mappings", "default": [],
          "columns": [
              {"id": "channel", "label": "Channel", "type": "select", "options": channel_options},
              {"id": "logo", "label": "Logo path", "type": "select", "options": logo_options},
-             {"id": "ignore", "label": "Ignore", "type": "boolean"},
          ]},
         {"id": "automatic_assignment", "type": "section", "label": "Automatic assignment", "collapsed": False},
         {"id": "automatic_setup_help", "type": "info", "section": "automatic_assignment",
-         "label": "Set up automatic matching",
-         "description": "Add a row for each channel group you want to match. Choose Standard, select a catalog folder, and save your settings. Then click Auto Match. Groups without an enabled row are skipped."},
-        {"id": "automatic_scope_help", "type": "info", "section": "automatic_assignment",
-         "label": "Choosing a folder",
-         "description": "The matcher only looks inside the selected folder and its subfolders. Choose Entire catalog to search all available logos. Catalog filters still apply."},
-        {"id": "automatic_replace_help", "type": "info", "section": "automatic_assignment",
-         "label": "Replacing logos",
-         "description": "Leave Replace unchecked to keep logos already assigned to channels. Saved manual mappings always take priority."},
-        {"id": "automatic_skipped_help", "type": "info", "section": "automatic_assignment",
-         "label": "If a channel is skipped",
-         "description": "Check the action result for the reason. You can broaden the folder, adjust catalog filters, or add a manual mapping. Use Standard + fuzzy only if Standard misses channels and you are willing to review possible false matches."},
+         "label": "Getting started",
+         "description": "Add a row for each channel group you want to match. Choose a strategy and catalog folder for each group, then save your settings. Run Auto Match to assign logos and review the results for channels that were skipped or failed."},
+        {"id": "automatic_group_help", "type": "info", "section": "automatic_assignment",
+         "label": "Group settings",
+         "description": "Group: The channel group to match.\nStrategy: Start with Standard, which uses names and station information. Standard + fuzzy also considers similar names.\nPath scope: Choose a catalog folder or Entire catalog. We recommend a country folder unless the group contains channels from multiple countries. Catalog filters still apply.\nReplace: Allows Auto Match to overwrite existing channel logos."},
         *([{"id": "automatic_missing_groups", "type": "info", "section": "automatic_assignment",
             "label": "Unavailable saved groups", "description": "These saved group IDs are not currently used by channels: " + ", ".join(sorted(unavailable_groups)) + ". They are not selectable or active."}] if unavailable_groups else []),
         {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
@@ -124,6 +135,9 @@ def make_fields(data_dir, settings, channels, groups=()):
              {"id": "scope", "label": "Path scope", "type": "select", "options": scope_options},
              {"id": "replace", "label": "Replace", "type": "boolean"},
          ]},
+        {"id": "automatic_ignored_channels", "type": "multiselect", "section": "automatic_assignment",
+         "label": "Channels to ignore", "default": ignored_ids, "options": ignore_options,
+         "description": "Auto Match will leave these channels unchanged. Manual Match can still apply an explicit manual mapping."},
         {"id": "automatic_advanced", "type": "section", "label": "Automatic assignment - Advanced", "collapsed": True},
         {"id": "automatic_prefix", "type": "string", "section": "automatic_advanced",
          "label": "Name prefix to remove", "default": "",

@@ -1,15 +1,8 @@
 # Logo Library
 
-A [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) plugin for mapping
-channel logos from logo catalogs. Choose a channel and a catalog logo in
-the plugin settings, then apply your saved mappings to Dispatcharr.
-
-See the [user guide](USER_GUIDE.md) for a typical setup and recommended group
-settings.
-
-> **Development preview:** Logo Library has not yet been validated against a
-> running Dispatcharr instance. The minimum Dispatcharr version and release
-> workflows are also unverified. Do not use it in production yet.
+A [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) plugin for assigning
+channel logos from the [tv-logos catalog](https://github.com/tv-logo/tv-logos).
+Use automatic matching by channel group or choose individual logos manually.
 
 ## Support
 
@@ -19,170 +12,93 @@ This project is maintained in my spare time. If it's saved you some headaches, a
 
 ---
 
-## How it works
-
-Logo catalogs manage their own storage and actions. Selected images are copied
-into Dispatcharr's local logo directory when mappings are applied, so assigned
-logos do not depend on the plugin being enabled or on a catalog being reachable.
-
-- Map multiple channels to the same logo.
-- Replace existing channel logos, including logos on automatically created channels.
-- Keep mappings in the settings table after applying them.
-- Select logos from multiple catalogs in the same mapping table.
-- Update a logo catalog using its action.
-- Use **Manual Match** to refresh assigned copies after catalog updates.
-
-Automatic assignment runs only when explicitly requested. Under **Automatic
-assignment**, add a row for each group to enable, choose its strategy, catalog
-scope and replacement policy, then save and run **Auto Match**. Only groups
-used by channels are selectable, using their effective group assignments. The
-sole registered catalog is selected automatically; matching is disabled if
-multiple catalogs are registered until catalog selection is available.
-Groups without a valid enabled configuration are skipped. Saved manual mappings always
-take precedence, including incomplete mappings with a channel selected. By
-default, channels with an effective logo are skipped; select **Replace** in a
-group row to allow it. Review
-the action result for skipped channels and failures. Channels outside enabled group configurations are
-omitted from the results and skip counts. Invalid group configurations are
-still reported. Catalog updates do not trigger matching.
-
-The directory selector lists paths from the filtered catalog index. A saved path
-that is no longer available remains visible, but an empty scope produces a
-configuration error rather than a series of misleading `no_match` results.
-Select **Entire catalog**, or leave the scope blank, to search all logos that
-pass the catalog filters.
-
-The collapsed **Automatic assignment - Advanced** section contains optional prefix, fuzzy
-threshold and variant controls. The shared prefix may be literal or Python
-regex; regex is matched only at the beginning of the channel name. Avoid
-expressions with excessive backtracking, which can stall the matching task.
-Previously saved group-specific prefix rules remain available in this section
-until removed and take precedence over the shared prefix. Invalid regex and
-duplicate group rules disable that group. Older prefix and threshold values in
-the main group table are ignored. The default fuzzy threshold is 90 percent.
-
-Enabled groups use a layered matcher. It looks for exact normalized names,
-station-specific call signs, and exact name components separated by a pipe or
-spaced dash, regardless of any country prefix. Distinct strong candidates are
-reported as conflicts. The strategy choice controls fuzzy fallback: selecting
-**Standard + fuzzy** enables it after the stronger evidence fails; Standard
-uses only stronger evidence. The result records the method used.
-
-The normalized-name matcher uses Unicode normalization,
-case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
-It preserves digits and does not transliterate or equate spelled-out numbers
-with digits. It considers common descriptive suffixes such as `channel`,
-`network` and `television` only when an exact name does not match. A small set
-of country-scoped TV Logos aliases handles known alternate branding. An optional
-literal or regex channel-name prefix is removed first. For TV
-Logos, recognized country suffixes are stripped only in their corresponding
-country directories; `hd`, `hz`, and `horizontal` filename suffixes are treated
-as variants. Multiple matching paths are ambiguous by default. The optional
-**Prefer standard variant** setting selects a single unmarked path only if all
-candidates share a recognized HD or horizontal variant family. Other
-country suffixes remain part of the name until explicitly supported.
-
-The call-sign matcher considers uppercase US-style `K` or `W` call signs and
-Canadian `C` call signs in channel names. It only uses station-specific TV
-Logos directories `countries/united-states/us-local` and
-`countries/canada/local`, narrowed by the configured scope. A generic filename
-containing a call-sign-shaped word is not treated as station evidence. Multiple
-call signs or unresolved variants are skipped. This heuristic does not verify
-station identity.
-
-**Use guide IDs as a station hint** is off by default. When enabled, a guide
-ID may supply a call sign missing from the channel name, but only when it
-resolves to a station-specific catalog file and the channel name agrees with
-the network in that filename. The guide ID is checked again before assignment.
-Guide IDs can change or become stale: network agreement cannot distinguish two
-stations on the same network, so this option can still assign the wrong city.
-It never changes the saved manual mapping or uses guide IDs as a durable key.
-
-**Allow generic network logos** is off by default. When enabled, an unmatched
-channel with an explicit station call sign may use an exact generic network
-logo as a substitute for that local station. It requires a whole network-name
-prefix and preserves numbered variants, such as CTV and CTV 2. The match is
-reported as `network_fallback` and the action reports the number applied. This
-is a network-level substitute, not a verified station-specific logo. Manual
-mappings still take priority.
-
-The fuzzy matcher scores normalized names with Python's
-`SequenceMatcher` ratio, expressed as a percentage. A match must score strictly
-above the configured threshold, so a threshold of 100 cannot match anything.
-Digit sequences and the presence of `plus` must agree. Exact top-score ties
-are skipped unless the standard-variant preference resolves a recognized variant
-family; a close second score does not prevent a unique winner. The score
-is a similarity measure, not a probability that an assignment is correct.
-
-## Catalog filters
-
-Use the collapsed **Catalog filters** section to narrow manual logo choices,
-automatic scope choices and Auto Match candidates. Filters currently apply to
-TV Logos. Each row selects an include or exclude mode and text to match against
-the full catalog-relative path.
-Contains, starts with, exact, and regex modes are case-insensitive. For example,
-an **Include contains** row with `canada` shows matching paths.
-
-When there are include rows, a path must match at least one of them. Any matching
-exclude row removes it from the choices. Without include rows, all paths are
-included before exclusions. Filters also apply when **Entire catalog** is
-selected. Existing manual mappings remain selectable and can be applied even
-when filtered out. Save the settings, reload the plugin, and reopen its settings
-to refresh the choices. Auto Match rechecks filter settings before assignment.
-
-Regex uses Python's regular expression syntax. Invalid or incomplete rows are
-reported in the filter section after reload. Auto Match does not run until
-filter errors are corrected, preventing an invalid filter from widening the
-candidate set. Manual choices ignore invalid filter rows. Avoid expressions that
-cause excessive backtracking, as they can stall matching or the settings page.
-
-## Manual assignment
+## Getting started
 
 1. Enable Logo Library and approve its requested capabilities. The initial
    catalog download runs in the background.
-2. Once the initial catalog download completes, click **Reload plugin** and reopen its settings.
-3. Under **Manual assignment**, add a row and select a channel and logo path.
-   The dropdown identifies each logo by catalog and catalog-relative path.
-4. Save the plugin settings, then run **Manual Match**. Review the action
-   result for skipped rows and errors.
+2. When the download completes, click **Reload plugin** and reopen its settings.
+3. Under **Automatic assignment**, add a row for each channel group to match.
+   Choose a strategy and catalog folder, then save your settings.
+4. Run **Auto Match** and review the results for skipped and failed channels.
+5. For specific logos, add rows under **Manual assignment**, save, and run
+   **Manual Match**.
 
-An explicit mapping replaces the channel's existing logo. Duplicate channel
-rows are skipped, as are missing channels or logo files; other valid mappings
-can still be applied. To protect a channel without assigning a logo, add a row
-and select **Ignore**. Neither action assigns a logo for an ignored row. During
-Auto Match, complete manual mappings and ignored rows are reported as successful
-preservations, not skips. A preserved mapping has not necessarily been applied
-or verified. Incomplete and duplicate rows are reported as problems and still
-protect their channels from automatic assignment. Removing a row stops managing that channel but does not
-remove or restore its previously assigned logo. Disabling or uninstalling the
-plugin does not remove assigned copies.
+See the [user guide](USER_GUIDE.md) for detailed setup and recommendations.
 
-After updating a catalog, reload the plugin and reopen its settings
-before editing mappings. Catalog updates do not change assigned logos until you
-run **Manual Match** again. Image caches may delay visible changes.
+## Automatic assignment
 
-### Current limitations
+Auto Match runs only when requested, for groups with a valid enabled row. Start
+with **Standard**, which uses channel names and station information. **Standard
++ fuzzy** also considers similar names when stronger matches are unavailable.
+Review assignments, especially when using fuzzy matching.
 
-Dispatcharr's native table dropdowns are not searchable. Its plugin field
-options are also cached per process, so a settings save can still encounter
-stale options after a reload. Confirm that saving succeeded before applying
-changes. A future upstream fix is needed for reliable field refresh across
-processes.
+Choose a catalog folder to limit the search, including its subfolders. A country
+folder is a useful starting point unless a group spans multiple countries.
+Choose **Entire catalog** to search all available paths. Catalog filters still
+apply. A saved folder with no available logos produces a configuration error.
 
-## Dispatcharr requirements
+By default, Auto Match leaves existing channel logos alone. Check **Replace**
+to allow overwriting them for a group. Saved manual mappings take priority,
+including incomplete mappings with a channel selected. Channels outside enabled
+groups are omitted from results; configuration errors are reported.
 
-The manifest targets Dispatcharr `v0.34.0` or newer and uses manifest version 2.
-This minimum is provisional until tested. Enabling the plugin requests these
-capabilities:
+Use **Channels to ignore** below the group table to exclude individual channels
+from Auto Match. This does not prevent an explicit Manual Match. To add all
+skipped and failed channels from the latest Auto Match result, run **Ignore
+skipped and failed channels**, then reload the plugin and reopen its settings.
+The action needs an available task result.
 
-| Capability | Purpose |
-|---|---|
-| Background tasks | Download the catalog and apply mappings without blocking the UI. |
-| Persistent service | Use Dispatcharr's leader lifecycle to queue the initial download. |
-| Outbound network | Download logo catalogs. |
-| Filesystem write | Copy selected logos into `/data/logos` for Dispatcharr to serve. |
+Complete manual mappings and ignored channels are reported as preserved or
+ignored rather than skipped. A preserved mapping has not necessarily been
+applied or verified. Review skipped channels and failures in the action result.
 
-Logo catalogs may need persistent and temporary disk space.
+### Advanced settings
+
+The collapsed **Automatic assignment - Advanced** section includes options for
+name prefixes, fuzzy threshold and logo variants. Prefixes can be literal or
+Python regex. Avoid regex patterns with excessive backtracking, which can stall
+the matching task. The fuzzy threshold defaults to 90 percent; a match must
+score above it. Similarity is not a probability that a logo is correct.
+
+**Use guide IDs as a station hint** and **Allow generic network logos** are off
+by default. Guide IDs may be stale and cannot verify a station's city. A generic
+network logo is a substitute, not a confirmed station-specific logo. See the
+[user guide](USER_GUIDE.md) before enabling these options.
+
+## Manual assignment
+
+Add a channel and logo path to the mapping table, save, and run **Manual Match**.
+An explicit mapping replaces the channel's existing logo. Duplicate rows,
+missing channels and unavailable logo files are skipped; other valid mappings
+can still be applied. Removing a mapping does not remove or restore its assigned
+logo.
+
+Selected images are copied into Dispatcharr's local logo directory. Assigned
+logos remain available if the plugin is disabled or the catalog is unreachable.
+After a catalog update, run Manual Match again to refresh assigned copies.
+Image caches may delay visible changes.
+
+## Catalog filters and updates
+
+Use **Catalog filters** to narrow manual logo choices, automatic scope choices
+and Auto Match candidates. Include and exclude rules match full catalog-relative
+paths using case-insensitive contains, starts with, exact or regex matching.
+Includes are combined; any matching exclusion removes a path. Saved manual
+mappings remain available even if filtered out. Invalid filter settings stop
+Auto Match until corrected.
+
+Use **Refresh tv-logos** to download the latest catalog. Save settings, reload
+the plugin and reopen its settings to refresh choices after changing filters or
+updating the catalog. Catalog updates do not automatically assign logos.
+Dispatcharr caches field options per process, so confirm that settings saved
+successfully after a reload.
+
+## Requirements
+
+The manifest targets Dispatcharr `v0.34.0` or newer; this minimum is
+provisional. The plugin requests background tasks, persistent service, outbound
+network and filesystem write capabilities to manage the catalog and logos.
+Catalog updates require disk space for snapshots and temporary files.
 
 ## Logo catalog credits
 
