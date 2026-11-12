@@ -1,12 +1,13 @@
 """Orchestrate group matching with a guarded, injected assignment function."""
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 from .automatic import compile_groups
 from .callsign_matching import build_callsign_index, build_station_name_index
 from .catalog_scope import scoped_paths
 from .filters import catalog_filter_rules, matches
 from .matching_engine import build_network_index, match_channel
+from .mappings import manual_disposition
 from .name_matching import build_name_index
 
 
@@ -20,12 +21,15 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
     manual = settings.get("mappings", [])
     if not isinstance(manual, list):
         raise ValueError("Manual mappings must be a list")
-    manual_ids = {str(row["channel"]) for row in manual if isinstance(row, dict)
-                  and row.get("channel") not in (None, "")}
+    manual_rows = defaultdict(list)
+    for row in manual:
+        if isinstance(row, dict) and row.get("channel") not in (None, ""):
+            manual_rows[str(row["channel"])].append(row)
     catalogs = tuple(catalogs)
     catalog_by_id = {catalog.id: catalog for catalog in catalogs}
     group_ids = {str(group) for group in group_ids}
     groups, errors = compile_groups(settings.get("automatic_groups", []), group_ids, catalog_by_id, settings)
+    enabled_groups = dict(groups)
     filter_rules, filter_errors = catalog_filter_rules(settings.get("catalog_filters", []), catalogs)
     if filter_errors:
         errors.extend(f"Catalog filter: {error}" for error in filter_errors)
@@ -43,7 +47,8 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
         except Exception as exc:
             errors.append(f"Group {group_id}: could not read catalog: {exc}")
             del groups[group_id]
-    result = {"applied": 0, "skipped": 0, "failed": 0, "channels": [], "configuration_errors": errors}
+    result = {"applied": 0, "preserved": 0, "ignored": 0, "skipped": 0, "failed": 0,
+              "channels": [], "configuration_errors": errors}
     channels = list(channels)
     counts = Counter(str(channel["id"]) for channel in channels)
     indices = {}
@@ -52,13 +57,15 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
         group_id = str(channel["group_id"]) if channel.get("group_id") is not None else None
         config = groups.get(group_id)
         if config is None:
-            continue
+            if channel_id not in manual_rows or group_id not in enabled_groups:
+                continue
+            config = enabled_groups[group_id]
         detail = {"channel": channel_id, "name": channel.get("name", ""), "group": group_id}
         try:
             if counts[channel_id] > 1:
                 reason = "duplicate_channel"
-            elif channel_id in manual_ids:
-                reason = "manual_mapping"
+            elif channel_id in manual_rows:
+                reason = manual_disposition(manual_rows[channel_id])
             elif channel.get("logo_id") is not None and not config["replace"]:
                 reason = "existing_logo"
             else:
@@ -86,6 +93,9 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
             if reason is None:
                 result["applied"] += 1
                 detail["status"] = "applied"
+            elif reason in {"manual_mapping", "ignored"}:
+                result["preserved" if reason == "manual_mapping" else "ignored"] += 1
+                detail.update(status="success", outcome="manual_mapping_preserved" if reason == "manual_mapping" else "ignored")
             else:
                 result["skipped"] += 1
                 detail.update(status="skipped", reason=reason)

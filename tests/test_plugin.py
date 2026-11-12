@@ -56,6 +56,7 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["manual_assignment"]["type"], "section")
         self.assertEqual(by_id["manual_instructions"]["section"], "manual_assignment")
         self.assertEqual(by_id["mappings"]["section"], "manual_assignment")
+        self.assertEqual(by_id["mappings"]["columns"][-1], {"id": "ignore", "label": "Ignore", "type": "boolean"})
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_setup_help"]["section"], "automatic_assignment")
         self.assertIn("Groups without an enabled row are skipped", by_id["automatic_setup_help"]["description"])
@@ -64,6 +65,7 @@ class PluginTests(unittest.TestCase):
         self.assertIn("possible false matches", by_id["automatic_skipped_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
+        self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic matching - Advanced")
         self.assertNotIn("automatic_prefix_rules", by_id)
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
                          ["group", "strategy", "scope", "replace"])
@@ -261,6 +263,43 @@ class PluginTests(unittest.TestCase):
              patch("src.run_automatic", return_value=report):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
         self.assertIn("Generic network logos applied: 1", result["message"])
+
+    def test_automatic_action_reports_preserved_and_ignored_as_success(self):
+        report = {"applied": 0, "preserved": 1, "ignored": 1, "skipped": 0, "failed": 0,
+                  "configuration_errors": [], "channels": [
+                      {"channel": "1", "name": "A", "status": "success", "outcome": "manual_mapping_preserved"},
+                      {"channel": "2", "name": "B", "status": "success", "outcome": "ignored"}]}
+        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[]), \
+             patch("src.run_automatic", return_value=report):
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
+        self.assertEqual(result["status"], "ok")
+        self.assertIn("manual mappings preserved 1, ignored 1", result["message"])
+        self.assertEqual(result["channels"][0]["status"], "success")
+
+    def test_manual_mapping_alone_does_not_make_real_auto_run_partial(self):
+        class Catalog:
+            id = "tv_logos"
+            accepts_legacy_paths = True
+
+            def options(self, data_dir):
+                return ["countries/canada/abc-ca.png"]
+
+        settings = {"automatic_groups": [{"group": "1", "strategy": "exact", "scope": "countries/canada"}],
+                    "mappings": [{"channel": "1", "logo": "tv_logos:countries/canada/abc-ca.png"}]}
+        channels = [{"id": 1, "group_id": 1, "name": "ABC"}]
+        with patch("src.group_options", return_value=[{"value": "1", "label": "Group"}]), \
+             patch("src.automatic_channels", return_value=channels), patch("src.catalogs.CATALOGS", (Catalog(),)):
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": settings})
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual((result["preserved"], result["skipped"]), (1, 0))
+        self.assertEqual(result["channels"][0]["outcome"], "manual_mapping_preserved")
+
+    def test_manual_action_ignore_is_not_partial(self):
+        report = {"applied": 0, "ignored": 1, "skipped": 0, "errors": []}
+        with patch("src.group_options", return_value=[]), patch("src.apply_mappings", return_value=report):
+            result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": {}})
+        self.assertEqual(result["status"], "ok")
+        self.assertIn("ignored 1", result["message"])
 
     def test_automatic_action_includes_version_and_configuration_without_unrelated_settings(self):
         report = {"applied": 0, "skipped": 0, "failed": 0, "configuration_errors": [], "channels": []}

@@ -16,7 +16,9 @@ catalog does not run matching.
    catalog. Path choices come from its background-built index.
 3. For channels that need a particular logo, save rows under **Manual
    assignment**, then run **Manual Match**. Saved manual mappings take priority
-   over Auto Match, even if a mapping row is incomplete.
+   over Auto Match, even if a mapping row is incomplete. To protect a channel
+   without assigning a logo, add its row and check **Ignore**; no logo selection
+   is needed.
 4. Under **Automatic assignment**, add a row for one group. Choose a strategy
    and path scope, leave **Replace** off, and save.
 5. Run **Auto Match**, inspect its result, and review the channel logos. The
@@ -70,9 +72,9 @@ so a high score does not guarantee a correct logo.
 If an existing row shows **Standard (legacy station hint)**, it uses the same
 matching checks as Standard. You can change it to Standard when editing the row.
 
-## Advanced matching
+## Automatic matching - Advanced
 
-The collapsed **Advanced matching** controls apply to all configured groups.
+The collapsed **Automatic matching - Advanced** controls apply to all configured groups.
 Start with the defaults and change them deliberately:
 
 - **Logo variant preference:** The default, **Skip ambiguous variants**, is
@@ -100,10 +102,17 @@ Start with the defaults and change them deliberately:
 
 ## Safety and results
 
-Auto Match skips saved manual mappings and, unless **Replace** is enabled,
-channels with an existing effective logo. Before assigning, it rechecks the
+Auto Match preserves saved manual mappings and, unless **Replace** is enabled,
+skips channels with an existing effective logo. Before assigning, it rechecks the
 group, channel name, effective logo, and relevant saved settings. Conflicting
 evidence and unresolved ties are skipped.
+
+Auto Match reports complete manual rows as successfully preserved and Ignore
+rows as successfully ignored; neither makes the run partial. Preserved means
+Auto Match did not change the channel, not that Manual Match has applied or
+verified the saved logo. Incomplete or duplicate manual rows are reported as
+problems and still protect the channel from automatic assignment. Manual Match
+does not assign a logo for an Ignore row, even if a logo remains selected.
 
 The selected scope and available catalog files determine what can be matched.
 Even a unique match can be wrong, especially with fuzzy matching, generic

@@ -43,14 +43,15 @@ class Plugin:
                                    groups, catalogs.CATALOGS,
                                    lambda *args: guarded_assign_logo(Path(__file__).parent, *args))
             status = "partial" if result["skipped"] or result["failed"] or result["configuration_errors"] else "ok"
-            message = f"Applied {result['applied']}, skipped {result['skipped']}, failed {result['failed']}."
+            message = (f"Applied {result['applied']}, manual mappings preserved {result.get('preserved', 0)}, "
+                       f"ignored {result.get('ignored', 0)}, skipped {result['skipped']}, failed {result['failed']}.")
             generic_count = sum(item.get("method") == "network_fallback" and item["status"] == "applied"
                                 for item in result["channels"])
             if generic_count:
                 message += f" Generic network logos applied: {generic_count}."
             details = result["configuration_errors"] + [
                 f"channel {item['channel']} ({item['name']}): {item['reason']}"
-                for item in result["channels"] if item["status"] != "applied"
+                for item in result["channels"] if item["status"] in {"skipped", "failed"}
             ]
             if details:
                 message += " " + "; ".join(details)
@@ -67,7 +68,7 @@ class Plugin:
             result = apply_mappings(context["data_dir"], settings.get("mappings", []), assign_logo)
             status = "partial" if result["skipped"] else "ok"
             errors = "; ".join(f"row {e['row']} (channel {e['channel']}): {e['message']}" for e in result["errors"])
-            message = f"Applied {result['applied']}, skipped {result['skipped']}."
+            message = f"Applied {result['applied']}, ignored {result.get('ignored', 0)}, skipped {result['skipped']}."
             if errors:
                 message += " " + errors
             return {"status": status, "message": message, "plugin_version": self.version,

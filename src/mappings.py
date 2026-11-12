@@ -5,6 +5,23 @@ from collections import Counter
 from . import catalogs
 
 
+def manual_disposition(rows):
+    """Classify saved rows for one channel without claiming a logo was applied."""
+    if not rows:
+        return None
+    if len(rows) > 1:
+        return "manual_mapping_conflict"
+    row = rows[0]
+    ignore = row.get("ignore")
+    if ignore is not None and not isinstance(ignore, bool):
+        return "manual_mapping_invalid"
+    if ignore is True:
+        return "ignored"
+    if not isinstance(row.get("logo"), str) or not row["logo"].strip():
+        return "manual_mapping_incomplete"
+    return "manual_mapping"
+
+
 def apply_mappings(data_dir, rows, assign):
     """Apply valid rows with an injected Dispatcharr assignment function.
 
@@ -15,7 +32,7 @@ def apply_mappings(data_dir, rows, assign):
         raise ValueError("Mappings must be a list")
     counts = Counter(str(row.get("channel")) for row in rows
                      if isinstance(row, dict) and row.get("channel") not in (None, ""))
-    result = {"applied": 0, "skipped": 0, "errors": []}
+    result = {"applied": 0, "ignored": 0, "skipped": 0, "errors": []}
     for index, row in enumerate(rows, 1):
         channel = row.get("channel") if isinstance(row, dict) else None
         try:
@@ -23,6 +40,12 @@ def apply_mappings(data_dir, rows, assign):
                 raise ValueError("Select a channel")
             if counts[str(channel)] > 1:
                 raise ValueError("Channel is mapped more than once")
+            disposition = manual_disposition([row])
+            if disposition == "manual_mapping_invalid":
+                raise ValueError("Ignore must be a boolean")
+            if disposition == "ignored":
+                result["ignored"] += 1
+                continue
             catalog, path = catalogs.parse_logo(row.get("logo"))
             with catalog.resolve(data_dir, path) as image:
                 assign(str(channel), f"{catalog.id}:{path}", image)

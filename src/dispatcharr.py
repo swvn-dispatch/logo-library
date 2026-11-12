@@ -107,6 +107,7 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
     from apps.plugins.models import PluginConfig
     from . import catalogs
     from .automatic import compile_groups
+    from .mappings import manual_disposition
 
     with transaction.atomic():
         key = normalize_plugin_key(Path(code_dir).name)
@@ -117,8 +118,10 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
         mappings = settings.get("mappings", [])
         if not isinstance(mappings, list):
             return "settings_changed"
-        if any(isinstance(row, dict) and str(row.get("channel")) == channel_id for row in mappings):
-            return "manual_mapping"
+        channel_rows = [row for row in mappings if isinstance(row, dict) and str(row.get("channel")) == channel_id]
+        disposition = manual_disposition(channel_rows)
+        if disposition:
+            return disposition
         if not ChannelGroup.objects.filter(pk=group_id).exists():
             return "missing_group"
         groups, _ = compile_groups(settings.get("automatic_groups", []), [group_id],

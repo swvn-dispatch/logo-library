@@ -48,8 +48,12 @@ class DispatcharrTests(unittest.TestCase):
             args = ("/plugin", "1", "2", "Effective", None, expected, "tv_logos:a.png", Path("a.png"))
             self.assertIsNone(guarded_assign_logo(*args))
             assign.assert_called_once()
-            settings["mappings"] = [{"channel": "1"}]
+            settings["mappings"] = [{"channel": "1", "logo": "tv_logos:a.png"}]
             self.assertEqual(guarded_assign_logo(*args), "manual_mapping")
+            settings["mappings"] = [{"channel": "1", "ignore": True}]
+            self.assertEqual(guarded_assign_logo(*args), "ignored")
+            settings["mappings"] = [{"channel": "1"}]
+            self.assertEqual(guarded_assign_logo(*args), "manual_mapping_incomplete")
             settings["mappings"] = []
             override.logo_id = 5
             self.assertEqual(guarded_assign_logo(*args), "existing_logo")

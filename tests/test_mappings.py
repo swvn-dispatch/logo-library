@@ -12,6 +12,21 @@ from src.mappings import apply_mappings
 
 
 class MappingTests(unittest.TestCase):
+    def test_ignored_rows_need_no_logo_and_never_assign(self):
+        calls = []
+        rows = [{"channel": "1", "ignore": True}, {"channel": "2", "ignore": True, "logo": "old.png"}]
+        result = apply_mappings("/unused", rows, lambda *args: calls.append(args))
+        self.assertEqual((result["applied"], result["ignored"], result["skipped"]), (0, 2, 0))
+        self.assertEqual(calls, [])
+
+    def test_duplicate_and_invalid_ignore_rows_are_reported(self):
+        rows = [{"channel": "1", "ignore": True}, {"channel": "1", "logo": "old.png"},
+                {"channel": "2", "ignore": "true"}]
+        result = apply_mappings("/unused", rows, lambda *args: self.fail("must not assign"))
+        self.assertEqual((result["ignored"], result["skipped"]), (0, 3))
+        self.assertIn("more than once", result["errors"][0]["message"])
+        self.assertIn("boolean", result["errors"][2]["message"])
+
     def test_partial_success_and_duplicate_channels(self):
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as archive:

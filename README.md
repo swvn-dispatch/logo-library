@@ -52,7 +52,7 @@ configuration error rather than a series of misleading `no_match` results.
 Select **Entire catalog**, or leave the scope blank, to search all logos that
 pass the catalog filters.
 
-The collapsed **Advanced matching** section contains optional prefix, fuzzy
+The collapsed **Automatic matching - Advanced** section contains optional prefix, fuzzy
 threshold and variant controls. The shared prefix may be literal or Python
 regex; regex is matched only at the beginning of the channel name. Avoid
 expressions with excessive backtracking, which can stall the matching task.
@@ -148,7 +148,12 @@ cause excessive backtracking, as they can stall matching or the settings page.
 
 An explicit mapping replaces the channel's existing logo. Duplicate channel
 rows are skipped, as are missing channels or logo files; other valid mappings
-can still be applied. Removing a row stops managing that channel but does not
+can still be applied. To protect a channel without assigning a logo, add a row
+and select **Ignore**. Neither action assigns a logo for an ignored row. During
+Auto Match, complete manual mappings and ignored rows are reported as successful
+preservations, not skips. A preserved mapping has not necessarily been applied
+or verified. Incomplete and duplicate rows are reported as problems and still
+protect their channels from automatic assignment. Removing a row stops managing that channel but does not
 remove or restore its previously assigned logo. Disabling or uninstalling the
 plugin does not remove assigned copies.
 

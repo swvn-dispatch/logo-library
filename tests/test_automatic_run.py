@@ -49,10 +49,47 @@ class AutomaticRunTests(unittest.TestCase):
                                  {"id": 5, "group_id": 1, "name": "ABC"},
                                  {"id": 5, "group_id": 1, "name": "ABC"}])
         self.assertEqual([entry["reason"] for entry in result["channels"]],
-                         ["manual_mapping", "existing_logo", "no_match",
+                         ["manual_mapping_incomplete", "existing_logo", "no_match",
                           "duplicate_channel", "duplicate_channel"])
         self.assertEqual(result["skipped"], 5)
         self.assertEqual(self.calls, [])
+
+    def test_manual_mappings_and_ignored_channels_are_successful(self):
+        self.settings["mappings"] = [{"channel": "1", "logo": "tv_logos:old.png"},
+                                     {"channel": "2", "ignore": True},
+                                     {"channel": "3", "ignore": True, "logo": "old.png"}]
+        result = self.run_match([{"id": i, "group_id": 1, "name": "ABC"} for i in (1, 2, 3)])
+        self.assertEqual((result["applied"], result["preserved"], result["ignored"], result["skipped"]), (0, 1, 2, 0))
+        self.assertEqual([row["status"] for row in result["channels"]], ["success", "success", "success"])
+        self.assertEqual([row["outcome"] for row in result["channels"]], ["manual_mapping_preserved", "ignored", "ignored"])
+        self.assertEqual(self.calls, [])
+
+    def test_incomplete_duplicate_and_invalid_manual_rows_do_not_override_channels(self):
+        self.settings["mappings"] = [{"channel": "1"}, {"channel": "2", "ignore": True},
+                                     {"channel": "2", "logo": "a.png"}, {"channel": "3", "ignore": "yes"}]
+        result = self.run_match([{"id": i, "group_id": 1, "name": "ABC"} for i in (1, 2, 3)])
+        self.assertEqual([row["reason"] for row in result["channels"]],
+                         ["manual_mapping_incomplete", "manual_mapping_conflict", "manual_mapping_invalid"])
+        self.assertEqual(result["skipped"], 3)
+        self.assertEqual(self.calls, [])
+
+    def test_manual_or_ignore_added_during_run_is_reported_as_success(self):
+        def guard(channel, *args):
+            return "manual_mapping" if channel == "1" else "ignored"
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"},
+                                 {"id": 2, "group_id": 1, "name": "ABC"}], guard)
+        self.assertEqual((result["preserved"], result["ignored"], result["skipped"]), (1, 1, 0))
+        self.assertTrue(all(row["status"] == "success" for row in result["channels"]))
+
+    def test_manual_mappings_remain_reported_when_filters_block_matching(self):
+        self.settings["catalog_filters"] = [{"mode": "exclude_regex", "text": "["}]
+        self.settings["mappings"] = [{"channel": "1", "logo": "tv_logos:old.png"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"},
+                                 {"id": 2, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(result["preserved"], 1)
+        self.assertEqual(result["channels"][0]["status"], "success")
+        self.assertTrue(result["configuration_errors"])
+        self.assertEqual(len(result["channels"]), 1)
 
     def test_guard_skip_and_failure_are_isolated(self):
         def assign(channel, *args):
