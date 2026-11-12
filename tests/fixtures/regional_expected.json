@@ -1,0 +1,13 @@
+{
+  "ENTERTAINMENT - CA": ["aptn", "ctv-comedy-channel", "ctv-drama-channel", "cottage-life", null, "food-network", "hgtv", null, "showcase", "slice", "tvo", "w-network"],
+  "ENTERTAINMENT - UK": ["bbc-one", "bbc-two", "channel-4", "channel-5", "e-4", "film-4", "food-network", "itv-1", "itv-2", "itv-3", "itv-4", "4-more", "quest", "quest-red", "really", "sky-atlantic", "sky-one", "u-and-dave", "u-and-gold"],
+  "ENTERTAINMENT - US": ["a-and-e", "amc", "bravo", "comedy-central", "discovery-channel", "e-entertainment", "fx", "food-network", "hbo", "hbo-hits", "hgtv", "hallmark-channel", "mtv", "mtv-2", "magnolia-network", null, "paramount-network", "tbs", "tlc", "tnt", "usa", "vice", "tru-tv"],
+  "LOCALS - CA": ["local/cbc-montreal-cbmt", "local/cbc-toronto-cblt", "generic:ctv-2", "generic:ctv", "generic:ctv", "generic:ctv", "generic:city-tv", "generic:city-tv", "global-montreal", "global-toronto", null, null, null, null],
+  "LOCALS - US": ["us-local/abc-7-wls", "us-local/abc-7-wabc", "us-local/abc-7-wjla", "us-local/cbs-2-wbbm", "us-local/cbs-2-wcbs", "us-local/cbs-9-wusa", "us-local/fox-32-wfld", "us-local/fox-5-wnyw", "us-local/fox-5-wttg", "us-local/nbc-5-wmaq", "us-local/nbc-4-wnbc", "us-local/nbc-4-wrc"],
+  "NEWS - CA": ["bnn-bloomberg", "cbc-news-network", null, "cpac", "ctv-news", "cp24", null, null],
+  "NEWS - US": ["bloomberg-television", "c-span-1", "c-span-2", "c-span-3", "cnbc", "cnn", "ms-now", "news-nation"],
+  "SPORTS - CA": ["sportsnet-360", "sportsnet-east", "sportsnet-one", "sportsnet-ontario", "sportsnet-pacific", "sportsnet-west", "sportsnet-world", "tsn-1", "tsn-2", "tsn-3", "tsn-4", "tsn-5"],
+  "SPORTS - QC": ["rds", "rds-2", "rds-info", "tva-sports", "tva-sports-2"],
+  "SPORTS - UK": ["sky-sports-f1", "sky-sports-main-event", "sky-sports-mix", "sky-sports-nfl", "sky-sports-premier-league", "tnt-sports-1", "tnt-sports-10", "tnt-sports-2", "tnt-sports-3", "tnt-sports-4", "tnt-sports-5", "tnt-sports-6", "tnt-sports-7", "tnt-sports-8", "tnt-sports-9"],
+  "SPORTS - US": ["espn", "espn-2", "espn-u", "fox-sports-1", "fox-sports-2", "nfl-red-zone"]
+}

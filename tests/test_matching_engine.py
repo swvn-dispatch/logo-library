@@ -1,6 +1,6 @@
 import unittest
 
-from src.callsign_matching import build_callsign_index
+from src.callsign_matching import build_callsign_index, build_station_name_index
 from src.matching_engine import build_network_index, match_channel
 from src.name_matching import build_name_index
 
@@ -56,6 +56,38 @@ class MatchingEngineTests(unittest.TestCase):
     def test_delimiters_are_not_tied_to_country_codes(self):
         self.assertEqual(self.match("Regional - Global Montreal - CKMI", "countries/canada")["path"], self.paths[3])
         self.assertEqual(self.match("Any Provider | RDS 2", "countries/canada")["path"], self.paths[8])
+
+    def test_colon_regions_and_two_letter_channel_names(self):
+        paths = ["countries/united-states/fx-us.png", "countries/united-states/abc-us.png"]
+        names = build_name_index(paths, "tv_logos")
+        self.assertEqual(match_channel("US: FX", self.config, names, {}, "tv_logos")["path"], paths[0])
+        self.assertEqual(match_channel("US | FX", self.config, names, {}, "tv_logos")["path"], paths[0])
+        self.assertEqual(match_channel("Provider: FX", self.config, names, {}, "tv_logos")["path"], paths[0])
+
+    def test_parenthesized_acronym_is_exact_evidence(self):
+        paths = ["countries/canada/cp24-ca.png", "countries/canada/cbc-ca.png"]
+        names = build_name_index(paths, "tv_logos")
+        self.assertEqual(match_channel("CA: Cable Pulse 24 (CP24)", self.config, names, {}, "tv_logos")["path"], paths[0])
+        self.assertIsNone(match_channel("CA: CTV News (HD)", self.config, names, {}, "tv_logos")["path"])
+
+    def test_station_name_without_callsign_uses_exact_city_evidence(self):
+        scope = "countries/canada"
+        names = build_name_index(self.paths, "tv_logos", scope)
+        calls = build_callsign_index(self.paths, "tv_logos", scope)
+        stations = build_station_name_index(self.paths, "tv_logos", scope)
+        result = match_channel("CBC Toronto", self.config, names, calls, "tv_logos", station_name_index=stations)
+        self.assertEqual(result["path"], self.paths[1])
+        self.assertEqual(result["method"], "station_name")
+        result = match_channel("CBC Montreal", self.config, names, calls, "tv_logos", station_name_index=stations)
+        self.assertEqual(result["path"], self.paths[0])
+
+    def test_multiple_same_name_stations_remain_ambiguous(self):
+        paths = ["countries/canada/local/cbc-toronto-cblt-ca.png",
+                 "countries/canada/local/cbc-toronto-cxyz-ca.png"]
+        stations = build_station_name_index(paths, "tv_logos")
+        result = match_channel("CBC Toronto", self.config, {}, {}, "tv_logos", station_name_index=stations)
+        self.assertEqual(result["reason"], "ambiguous")
+        self.assertIsNone(result["path"])
 
     def test_conflicting_strong_evidence_is_skipped(self):
         result = self.match("CA | Global Montreal | CBLT", "countries/canada")

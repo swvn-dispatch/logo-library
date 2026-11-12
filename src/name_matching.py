@@ -14,6 +14,21 @@ _COUNTRY_SUFFIXES = {
     "australia": "au", "new-zealand": "nz",
 }
 _VARIANTS = {"hd", "hz", "horizontal"}
+_GENERIC_SUFFIXES = ("television", "channel", "network")
+# Exact alternate branding for filenames in TV Logos. These are scoped to the
+# catalog's country directory, never applied to another catalog or country.
+_TV_LOGOS_ALIASES = {
+    ("united-kingdom", "4more"): ("more4",),
+    ("united-states", "eentertainment"): ("e",),
+    ("united-states", "cspan1"): ("cspan",),
+}
+
+
+def _without_generic_suffix(name):
+    for suffix in _GENERIC_SUFFIXES:
+        if name.endswith(suffix) and len(name) - len(suffix) >= 3:
+            return name[:-len(suffix)]
+    return None
 
 
 def normalize_name(value, prefix="", prefix_mode="literal"):
@@ -59,10 +74,21 @@ def build_name_index(paths, catalog_id, scope=""):
     Callers should pass paths from the selected catalog's existing index.
     """
     index = defaultdict(set)
+    aliases = defaultdict(set)
     for value, path in scoped_paths(paths, scope):
         name = normalize_name(_filename_name(path, catalog_id))
         if name:
             index[name].add(value)
+            alias = _without_generic_suffix(name)
+            if alias:
+                aliases[alias].add(value)
+            if catalog_id == "tv_logos" and len(path.parts) >= 3 and path.parts[0] == "countries":
+                for alternative in _TV_LOGOS_ALIASES.get((path.parts[1], name), ()):
+                    aliases[alternative].add(value)
+    # Explicit names take precedence over inferred descriptive suffix aliases.
+    for key, values in aliases.items():
+        if key not in index:
+            index[key].update(values)
     return {name: tuple(sorted(values)) for name, values in index.items()}
 
 
@@ -70,6 +96,9 @@ def match_name(channel_name, index, prefix="", prefix_mode="literal", variant="s
     """Return a unique path or a reason suitable for reporting a skip."""
     key = normalize_name(channel_name, prefix, prefix_mode)
     candidates = index.get(key, ()) if key else ()
+    if not candidates and key:
+        shorter = _without_generic_suffix(key)
+        candidates = index.get(shorter, ()) if shorter else ()
     if not candidates:
         return {"path": None, "reason": "no_match"}
     selected = select_variant(candidates, variant, catalog_id)

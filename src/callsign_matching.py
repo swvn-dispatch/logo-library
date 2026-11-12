@@ -5,6 +5,7 @@ import re
 
 from .catalog_scope import scoped_paths
 from .variants import select_variant
+from .name_matching import normalize_name
 
 # Only station-looking, uppercase channel tokens are extracted. A call sign
 # alone does not establish station identity outside station-specific paths.
@@ -30,6 +31,26 @@ def build_callsign_index(paths, catalog_id, scope=""):
             if re.fullmatch(pattern, token):
                 index[token.upper()].add(value)
     return {token: tuple(sorted(values)) for token, values in index.items()}
+
+
+def build_station_name_index(paths, catalog_id, scope=""):
+    """Index exact local station names when the filename includes a call sign."""
+    index = defaultdict(set)
+    for value, path in scoped_paths(paths, scope):
+        region = path.parts[:3]
+        if catalog_id != "tv_logos" or region not in (_US_LOCAL, _CA_LOCAL):
+            continue
+        parts = path.stem.lower().split("-")
+        if parts and parts[-1] in {"us", "ca"}:
+            parts.pop()
+        if parts and parts[-1] in {"hd", "hz", "horizontal"}:
+            continue
+        pattern = r"[kw][a-z]{2,3}" if region == _US_LOCAL else r"c[a-z]{3}"
+        if len(parts) > 1 and re.fullmatch(pattern, parts[-1]):
+            key = normalize_name("-".join(parts[:-1]))
+            if key:
+                index[key].add(value)
+    return {key: tuple(sorted(values)) for key, values in index.items()}
 
 
 def match_callsign(channel_name, index, variant="strict", catalog_id=None):

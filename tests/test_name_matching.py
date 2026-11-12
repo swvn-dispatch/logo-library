@@ -37,6 +37,41 @@ class NameMatchingTests(unittest.TestCase):
         index = build_name_index(["countries/france/news-fr.png"], "tv_logos")
         self.assertEqual(match_name("News", index)["reason"], "no_match")
 
+    def test_descriptive_suffixes_are_conservative(self):
+        paths = ["countries/canada/ctv-comedy-channel-ca.png", "countries/canada/ctv-ca.png",
+                 "countries/canada/ctv-news-ca.png", "countries/canada/ctv-news-network-ca.png"]
+        index = build_name_index(paths, "tv_logos")
+        self.assertEqual(match_name("CTV Comedy", index)["path"], paths[0])
+        self.assertEqual(match_name("CTV Drama", index)["reason"], "no_match")
+        self.assertEqual(match_name("CTV News", index)["path"], paths[2])
+        self.assertEqual(match_name("CTV News Channel", index)["path"], paths[2])
+        self.assertEqual(match_name("CTV 2", index)["reason"], "no_match")
+
+    def test_reviewed_brand_aliases_are_country_and_catalog_scoped(self):
+        paths = ["countries/united-kingdom/4-more-uk.png", "countries/united-states/c-span-1-us.png",
+                 "countries/united-states/c-span-2-us.png", "countries/united-states/e-entertainment-us.png"]
+        uk = build_name_index(paths, "tv_logos", "countries/united-kingdom")
+        us = build_name_index(paths, "tv_logos", "countries/united-states")
+        other = build_name_index(paths, "other")
+        self.assertEqual(match_name("More4", uk)["path"], paths[0])
+        self.assertEqual(match_name("C-Span", us)["path"], paths[1])
+        self.assertEqual(match_name("C-Span 2", us)["path"], paths[2])
+        self.assertEqual(match_name("E!", us)["path"], paths[3])
+        self.assertEqual(match_name("More4", us)["reason"], "no_match")
+        self.assertEqual(match_name("More4", other)["reason"], "no_match")
+
+    def test_suffix_alias_does_not_override_exact_name_or_resolve_collisions(self):
+        exact = "countries/united-states/news-us.png"
+        aliases = ["countries/united-states/news-channel-us.png", "countries/united-states/news-network-us.png"]
+        self.assertEqual(match_name("News", build_name_index([exact, *aliases], "tv_logos"))["path"], exact)
+        self.assertEqual(match_name("News", build_name_index(aliases, "tv_logos"))["reason"], "ambiguous")
+
+    def test_unverified_renames_and_plus_variants_remain_distinct(self):
+        paths = ["countries/united-states/nasa-tv-us.png", "countries/united-states/network-2-us.png"]
+        index = build_name_index(paths, "tv_logos")
+        self.assertEqual(match_name("NASA+", index)["reason"], "no_match")
+        self.assertEqual(match_name("Network", index)["reason"], "no_match")
+
     def test_invalid_paths_and_scopes(self):
         for scope in ("../us", "/us", "us\\other"):
             with self.subTest(scope=scope), self.assertRaises(ValueError):

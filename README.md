@@ -69,7 +69,10 @@ use only stronger evidence. The result records the method used.
 The normalized-name matcher uses Unicode normalization,
 case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
 It preserves digits and does not transliterate or equate spelled-out numbers
-with digits. An optional literal or regex channel-name prefix is removed first. For TV
+with digits. It considers common descriptive suffixes such as `channel`,
+`network` and `television` only when an exact name does not match. A small set
+of country-scoped TV Logos aliases handles known alternate branding. An optional
+literal or regex channel-name prefix is removed first. For TV
 Logos, recognized country suffixes are stripped only in their corresponding
 country directories; `hd`, `hz`, and `horizontal` filename suffixes are treated
 as variants. Multiple matching paths are ambiguous by default. The optional

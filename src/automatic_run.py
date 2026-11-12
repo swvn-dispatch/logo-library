@@ -3,7 +3,7 @@
 from collections import Counter
 
 from .automatic import compile_groups
-from .callsign_matching import build_callsign_index
+from .callsign_matching import build_callsign_index, build_station_name_index
 from .catalog_scope import scoped_paths
 from .matching_engine import build_network_index, match_channel
 from .name_matching import build_name_index
@@ -61,10 +61,11 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
                     paths = catalog_paths[catalog.id]
                     indices[key] = (build_name_index(paths, catalog.id, config["scope"]),
                                     build_callsign_index(paths, catalog.id, config["scope"]),
-                                    build_network_index(paths, catalog.id, config["scope"]) if config["generic_fallback"] else None)
-                name_index, callsign_index, network_index = indices[key]
+                                    build_network_index(paths, catalog.id, config["scope"]) if config["generic_fallback"] else None,
+                                    build_station_name_index(paths, catalog.id, config["scope"]))
+                name_index, callsign_index, network_index, station_name_index = indices[key]
                 match = match_channel(channel["name"], config, name_index, callsign_index, catalog.id, network_index,
-                                      channel.get("guide_id"))
+                                      channel.get("guide_id"), station_name_index)
                 detail["method"] = match["method"]
                 if match.get("score") is not None:
                     detail["score"] = match["score"]

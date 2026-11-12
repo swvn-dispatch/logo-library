@@ -113,3 +113,12 @@ class AutomaticRunTests(unittest.TestCase):
         self.assertEqual(result["applied"], 1)
         self.assertEqual(result["channels"][0]["method"], "network_fallback")
         self.assertTrue(self.calls[0][4]["generic_fallback"])
+
+    def test_station_name_index_is_used_by_run(self):
+        self.catalog.options = lambda data_dir: ["countries/canada/cbc-toronto-ca.png",
+                                                "countries/canada/local/cbc-toronto-cblt-ca.png"]
+        self.settings["automatic_groups"][0]["scope"] = "countries/canada"
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "CBC Toronto"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(result["channels"][0]["method"], "station_name")
+        self.assertEqual(self.calls[0][5], "tv_logos:countries/canada/local/cbc-toronto-cblt-ca.png")

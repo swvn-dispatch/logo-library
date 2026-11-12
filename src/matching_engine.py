@@ -62,7 +62,8 @@ def _explicit_station(name, segments):
     )
 
 
-def match_channel(name, config, name_index, callsign_index, catalog_id, network_index=None, guide_id=None):
+def match_channel(name, config, name_index, callsign_index, catalog_id, network_index=None, guide_id=None,
+                  station_name_index=None):
     """Try exact evidence first; the strategy enables optional fuzzy fallback.
 
     Delimited components are considered independently of any country prefix or
@@ -83,7 +84,7 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
     if station["path"]:
         evidence.append((station["path"], "callsign", ""))
 
-    segments = re.split(r"\s*\|\s*|\s+[-\u2013\u2014]\s+", name)
+    segments = re.split(r"\s*\|\s*|\s+[-\u2013\u2014]\s+|:\s+", name)
     if config.get("guide_signals") and isinstance(guide_id, str) and guide_id:
         guide = match_callsign(html.unescape(guide_id).upper(), callsign_index, variant, catalog_id)
         if guide["path"]:
@@ -99,9 +100,10 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
                     station = guide
                     evidence.append((guide["path"], "guide_callsign", ""))
     if len(segments) > 1:
-        for segment in segments:
+        for segment_number, segment in enumerate(segments):
+            segment = re.sub(r"\s+\(" + _STATION_TOKEN + r"(?:-(?:TV|LD|CD|DT))?\)\s*$", "", segment)
             key = normalize_name(segment)
-            if len(key) < 2 or re.fullmatch(r"[A-Za-z]{2}", segment.strip()):
+            if not key or (segment_number == 0 and re.fullmatch(r"[A-Za-z]{2}", segment.strip())):
                 continue
             if len(segments) > 2 and re.fullmatch(r"(?:[KW][A-Z]{2,3}|C[A-Z]{3})(?:-(?:TV|LD|CD|DT))?", segment.strip()):
                 continue
@@ -110,15 +112,43 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
                 return {"path": None, "reason": "ambiguous", "method": "name_segment"}
             if match["path"]:
                 evidence.append((match["path"], "name_segment", key))
+            station_paths = (station_name_index or {}).get(key, ())
+            station_path = select_variant(station_paths, variant, catalog_id)
+            if station_paths and station_path is None:
+                return {"path": None, "reason": "ambiguous", "method": "station_name"}
+            if station_path:
+                evidence.append((station_path, "station_name", key))
+    elif station_name_index:
+        key = normalize_name(name, prefix, mode)
+        station_paths = station_name_index.get(key, ())
+        station_path = select_variant(station_paths, variant, catalog_id)
+        if station_paths and station_path is None:
+            return {"path": None, "reason": "ambiguous", "method": "station_name"}
+        if station_path:
+            evidence.append((station_path, "station_name", key))
+
+    # A parenthesized acronym is explicit alternative name evidence, not a
+    # license to substitute a loosely related network. Ignore quality tags and
+    # call signs, which are handled separately.
+    for alias in re.findall(r"\(([A-Z0-9]{3,10})\)", name):
+        if re.fullmatch(_STATION_TOKEN, alias):
+            continue
+        match = match_name(alias, name_index, variant=variant, catalog_id=catalog_id)
+        if match["reason"] == "ambiguous":
+            return {"path": None, "reason": "ambiguous", "method": "name_alias"}
+        if match["path"]:
+            evidence.append((match["path"], "name_alias", normalize_name(alias)))
 
     paths = {path for path, _, _ in evidence}
-    if len(paths) > 1 and station["path"]:
+    station_matches = {path for path, method, _ in evidence if method in {"callsign", "guide_callsign", "station_name"}}
+    if len(paths) > 1 and len(station_matches) == 1:
         # A station-specific file may refine an exact generic city logo, but
         # only when its filename begins with every competing exact name.
-        station_key = normalize_name(PurePosixPath(station["path"]).stem)
-        if all(path == station["path"] or (key and station_key.startswith(key))
+        station_path = next(iter(station_matches))
+        station_key = normalize_name(PurePosixPath(station_path).stem)
+        if all(path == station_path or (key and station_key.startswith(key))
                for path, _, key in evidence):
-            paths = {station["path"]}
+            paths = {station_path}
     if len(paths) > 1:
         return {"path": None, "reason": "conflicting_matches", "method": "combined"}
     if paths:
