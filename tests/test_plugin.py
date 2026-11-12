@@ -45,8 +45,7 @@ class PluginTests(unittest.TestCase):
             fields = make_fields(root, {}, [])
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
-            "automatic_assignment", "automatic_coming_soon", "automatic_default_groups", "automatic_default_strategy",
-            "automatic_default_scope", "automatic_default_replace", "automatic_group_help", "automatic_strategy_help",
+            "automatic_assignment", "automatic_coming_soon", "automatic_group_help", "automatic_strategy_help",
             "automatic_scope_help", "automatic_replace_help", "automatic_groups", "automatic_advanced", "automatic_prefix",
             "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
@@ -59,8 +58,8 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["mappings"]["section"], "manual_assignment")
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_coming_soon"]["section"], "automatic_assignment")
-        self.assertIn("override shared settings", by_id["automatic_coming_soon"]["description"])
-        self.assertEqual(by_id["automatic_default_groups"]["type"], "multiselect")
+        self.assertIn("Groups without an enabled row are skipped", by_id["automatic_coming_soon"]["description"])
+        self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
         self.assertNotIn("automatic_prefix_rules", by_id)
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
@@ -81,6 +80,15 @@ class PluginTests(unittest.TestCase):
         by_id = {field["id"]: field for field in fields}
         self.assertEqual(by_id["automatic_prefix_rules"]["section"], "automatic_advanced")
         self.assertIn("Remove all rows", by_id["automatic_prefix_help"]["description"])
+
+    def test_legacy_shared_groups_do_not_add_controls_or_notices(self):
+        settings = {"automatic_default_groups": ["1", "2"],
+                    "automatic_groups": [{"group": "2", "strategy": "disabled"}]}
+        options = [{"value": "1", "label": "Locals"}, {"value": "2", "label": "News"}]
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, settings, [], options)
+            self.assertFalse(any(field["id"].startswith("automatic_default_") or
+                                 field["id"] == "automatic_legacy_shared" for field in fields))
 
     def test_automatic_group_options_preserve_missing_groups(self):
         settings = {"automatic_groups": [{"group": "1"}, {"group": "9"}, {"group": "9"}]}

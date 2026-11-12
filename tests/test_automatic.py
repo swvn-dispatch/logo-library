@@ -71,25 +71,37 @@ class AutomaticGroupTests(unittest.TestCase):
         self.assertNotIn("1", groups)
         self.assertIn("Invalid prefix regex", errors[0])
 
-    def test_shared_groups_and_explicit_overrides(self):
+    def test_legacy_shared_groups_are_not_enabled_implicitly(self):
         settings = {"automatic_default_groups": ["1", "2", "3", "4"],
                     "automatic_default_scope": "countries/canada", "automatic_default_replace": True}
         rows = [{"group": "2", "strategy": "exact", "scope": "countries/us", "replace": False},
                 {"group": "3", "strategy": "disabled"},
                 {"group": "4", "strategy": "invalid"}]
         groups, errors = compile_groups(rows, [1, 2, 3, 4], {"tv"}, settings)
-        self.assertEqual(groups["1"]["scope"], "countries/canada")
-        self.assertTrue(groups["1"]["replace"])
+        self.assertNotIn("1", groups)
         self.assertEqual(groups["2"]["scope"], "countries/us")
         self.assertFalse(groups["2"]["replace"])
         self.assertNotIn("3", groups)
         self.assertNotIn("4", groups)
         self.assertEqual(len(errors), 1)
+        self.assertIn("Unknown strategy", errors[0])
+
+    def test_legacy_shared_warning_clears_when_rows_are_added(self):
+        settings = {"automatic_default_groups": ["1", "2"]}
+        rows = [{"group": "1", "strategy": "exact"}, {"group": "2", "strategy": "disabled"}]
+        groups, errors = compile_groups(rows, [1, 2], {"tv"}, settings)
+        self.assertEqual(errors, [])
+        self.assertEqual(set(groups), {"1"})
+
+    def test_removed_shared_groups_that_no_longer_exist_do_not_block(self):
+        groups, errors = compile_groups([], [], {"tv"}, {"automatic_default_groups": ["42"]})
+        self.assertEqual(groups, {})
+        self.assertEqual(errors, [])
 
     def test_shared_prefix_regex_and_guide_opt_in(self):
-        settings = {"automatic_default_groups": ["1"], "automatic_prefix": r"^US\s*\|\s*",
+        settings = {"automatic_prefix": r"^US\s*\|\s*",
                     "automatic_prefix_mode": "regex", "automatic_guide_signals": True}
-        groups, errors = compile_groups([], [1], {"tv"}, settings)
+        groups, errors = compile_groups([{"group": "1", "strategy": "exact"}], [1], {"tv"}, settings)
         self.assertEqual(errors, [])
         self.assertTrue(groups["1"]["guide_signals"])
         self.assertEqual(groups["1"]["prefix_mode"], "regex")

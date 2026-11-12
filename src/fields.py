@@ -72,9 +72,6 @@ def make_fields(data_dir, settings, channels, groups=()):
     ]
     saved_scopes = {row.get("scope") for row in group_rows if isinstance(row, dict)
                     and isinstance(row.get("scope"), str) and row.get("scope") not in ("", ".")} if isinstance(group_rows, list) else set()
-    default_scope = settings.get("automatic_default_scope")
-    if isinstance(default_scope, str) and default_scope not in ("", "."):
-        saved_scopes.add(default_scope)
     scope_options.extend({"value": path, "label": f"Unavailable: {path}"}
                          for path in sorted(saved_scopes - directories))
     unavailable_groups = set()
@@ -98,18 +95,7 @@ def make_fields(data_dir, settings, channels, groups=()):
          ]},
         {"id": "automatic_assignment", "type": "section", "label": "Automatic assignment", "collapsed": False},
         {"id": "automatic_coming_soon", "type": "info", "section": "automatic_assignment",
-         "description": "Select groups for shared settings. Optional group rows below override shared settings, including Disabled. Save before running Auto Match. Saved manual mappings take priority."},
-        {"id": "automatic_default_groups", "type": "multiselect", "section": "automatic_assignment",
-         "label": "Groups using shared settings", "default": [], "options": group_options},
-        {"id": "automatic_default_strategy", "type": "select", "section": "automatic_assignment",
-         "label": "Shared strategy", "default": "exact", "options": [
-             {"value": "exact", "label": "Exact evidence"},
-             {"value": "callsign", "label": "Station hint"},
-             {"value": "fuzzy", "label": "Include fuzzy matching"}]},
-        {"id": "automatic_default_scope", "type": "select", "section": "automatic_assignment",
-         "label": "Shared catalog scope", "default": ".", "options": scope_options},
-        {"id": "automatic_default_replace", "type": "boolean", "section": "automatic_assignment",
-         "label": "Replace existing logos for shared groups", "default": False},
+         "description": "Add one row for each group to match and save before running Auto Match. Groups without an enabled row are skipped. Saved manual mappings take priority."},
         {"id": "automatic_group_help", "type": "info", "section": "automatic_assignment",
          "description": "Channel group: select a group currently used by a channel."},
         {"id": "automatic_strategy_help", "type": "info", "section": "automatic_assignment",
@@ -120,7 +106,7 @@ def make_fields(data_dir, settings, channels, groups=()):
          "description": "Replace: allow matching to replace a channel's effective logo. Manual mappings always take priority."},
         *([{"id": "automatic_missing_groups", "type": "info", "section": "automatic_assignment",
             "label": "Unavailable saved groups", "description": "These saved group IDs are not currently used by channels: " + ", ".join(sorted(unavailable_groups)) + ". They are not selectable or active."}] if unavailable_groups else []),
-        {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group overrides", "default": [],
+        {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
          "columns": [
              {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
              {"id": "strategy", "label": "Strategy", "type": "select", "options": [

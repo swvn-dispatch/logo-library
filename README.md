@@ -4,6 +4,9 @@ A [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) plugin for mapping
 channel logos from logo catalogs. Choose a channel and a catalog logo in
 the plugin settings, then apply your saved mappings to Dispatcharr.
 
+See the [user guide](USER_GUIDE.md) for a typical setup and recommended group
+settings.
+
 > **Development preview:** Logo Library has not yet been validated against a
 > running Dispatcharr instance. The minimum Dispatcharr version and release
 > workflows are also unverified. Do not use it in production yet.
@@ -30,17 +33,15 @@ logos do not depend on the plugin being enabled or on a catalog being reachable.
 - Use **Manual Match** to refresh assigned copies after catalog updates.
 
 Automatic assignment runs only when explicitly requested. Under **Automatic
-assignment**, select groups that share a strategy, catalog scope and replacement
-policy, then save and run **Auto Match**. Optional group override rows take
-precedence over the shared settings, even when an override disables a group or
-is invalid. Existing per-group rows remain overrides. Only groups
+assignment**, add a row for each group to enable, choose its strategy, catalog
+scope and replacement policy, then save and run **Auto Match**. Only groups
 used by channels are selectable, using their effective group assignments. The
 sole registered catalog is selected automatically; matching is disabled if
 multiple catalogs are registered until catalog selection is available.
 Groups without a valid enabled configuration are skipped. Saved manual mappings always
 take precedence, including incomplete mappings with a channel selected. By
-default, channels with an effective logo are skipped; enable replacement in the
-shared settings or select **Replace** in a group override to allow it. Review
+default, channels with an effective logo are skipped; select **Replace** in a
+group row to allow it. Review
 the action result for skipped channels and failures. Channels outside enabled group configurations are
 omitted from the results and skip counts. Invalid group configurations are
 still reported. Catalog updates do not trigger matching.

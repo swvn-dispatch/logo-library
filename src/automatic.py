@@ -24,19 +24,9 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
                     and row.get("group") not in (None, "")}
     counts = Counter(str(row["group"]) for row in rows if isinstance(row, dict)
                      and row.get("group") not in (None, ""))
-    selected = settings.get("automatic_default_groups", [])
-    if not isinstance(selected, list) or any(not isinstance(group, (str, int)) or isinstance(group, bool) for group in selected):
-        return {}, ["Shared groups must be a list of group IDs"]
-    # An explicit row, including a disabled or invalid one, always overrides a
-    # shared selection. It must never silently fall back to a broader policy.
-    selected = dict.fromkeys(str(group) for group in selected if group not in (None, ""))
-    rows = list(rows) + [{"group": group, "strategy": settings.get("automatic_default_strategy", "exact"),
-                          "scope": settings.get("automatic_default_scope", ""),
-                          "replace": settings.get("automatic_default_replace", False)}
-                         for group in selected if group not in counts]
-    counts.update(group for group in selected if group not in counts)
     groups = {str(group) for group in group_ids}
-    compiled, errors = {}, []
+    compiled = {}
+    errors = []
     for index, row in enumerate(rows, 1):
         try:
             if not isinstance(row, dict) or row.get("group") in (None, ""):
