@@ -24,7 +24,7 @@ class DispatcharrTests(unittest.TestCase):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
         expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
                     "prefix": "", "prefix_mode": "literal", "variant": "strict", "generic_fallback": False,
-                    "guide_signals": False, "threshold": 90}
+                    "guide_signals": False, "threshold": 90, "catalog_filters": []}
         plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
         plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
         channel = types.SimpleNamespace(channel_group_id=8, name="Raw", logo_id=None)
@@ -69,6 +69,9 @@ class DispatcharrTests(unittest.TestCase):
             settings["automatic_generic_fallback"] = True
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("automatic_generic_fallback")
+            settings["catalog_filters"] = [{"mode": "exclude_contains", "text": "abc"}]
+            self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+            settings.pop("catalog_filters")
             settings["automatic_guide_signals"] = True
             override.tvg_id = "WABC.us"
             guide_args = ("/plugin", "1", "2", "Effective", "old.us", {**expected, "guide_signals": True},

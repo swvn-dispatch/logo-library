@@ -47,6 +47,13 @@ Scopes are relative to the catalog root. For example, select
 indexed logos is reported as a configuration error. A broader scope can find
 more logos but can also produce more ambiguous matches.
 
+**Catalog filters** limit the directory choices and logos available to Auto
+Match. This also applies when **Entire catalog** is selected. Save the filters,
+reload the plugin, and reopen settings to refresh the directory choices. An
+invalid filter prevents Auto Match from running until it is corrected. Saved
+manual mappings remain available and can still be applied even when their logos
+are filtered out.
+
 The Canadian local example uses `countries/canada` because some city-specific
 logos are outside the `local` directory. Quebec sports logos are under the
 Canadian catalog. These locations depend on the catalog and may change.

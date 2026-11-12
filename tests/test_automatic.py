@@ -25,6 +25,13 @@ class AutomaticGroupTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(groups["1"]["strategy"], "callsign")
 
+    def test_filter_configuration_is_snapshotted_for_write_guard(self):
+        settings = {"catalog_filters": [{"mode": "include_contains", "text": "canada"}]}
+        groups, errors = compile_groups([{"group": "1", "strategy": "exact"}], [1], {"tv"}, settings)
+        self.assertEqual(errors, [])
+        settings["catalog_filters"][0]["text"] = "us"
+        self.assertEqual(groups["1"]["catalog_filters"][0]["text"], "canada")
+
     def test_duplicates_and_missing_groups_are_rejected(self):
         row = {"group": "1", "strategy": "exact", "catalog": "tv"}
         groups, errors = compile_groups([row, row, {"group": "9"}], [1], {"tv"})

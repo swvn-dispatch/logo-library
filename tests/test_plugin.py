@@ -123,7 +123,27 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(scope["type"], "select")
         self.assertIn({"value": ".", "label": "Entire catalog"}, scope["options"])
         self.assertIn({"value": "countries/us/local", "label": "countries/us/local"}, scope["options"])
-        self.assertIn({"value": "us", "label": "Unavailable: us"}, scope["options"])
+        self.assertIn({"value": "us", "label": "Unavailable or filtered: us"}, scope["options"])
+
+    def test_filters_limit_scope_directories_but_preserve_saved_selections(self):
+        class Catalog:
+            id = label = "example"
+            accepts_legacy_paths = True
+
+            def options(self, data_dir):
+                return ["countries/canada/a.png", "countries/canada/local/b.png", "countries/us/c.png"]
+
+        settings = {"catalog_filters": [{"mode": "include_contains", "text": "CANADA"},
+                                        {"mode": "exclude_contains", "text": "/local/"}],
+                    "automatic_groups": [{"group": "1", "scope": "countries/us"}]}
+        with tempfile.TemporaryDirectory() as root, patch("src.catalogs.CATALOGS", (Catalog(),)):
+            fields = make_fields(root, settings, [], [{"value": "1", "label": "Group"}])
+        table = next(field for field in fields if field["id"] == "automatic_groups")
+        options = next(column for column in table["columns"] if column["id"] == "scope")["options"]
+        self.assertIn({"value": "countries/canada", "label": "countries/canada"}, options)
+        self.assertNotIn("countries/canada/local", [option["value"] for option in options])
+        self.assertIn({"value": "countries/us", "label": "Unavailable or filtered: countries/us"}, options)
+        self.assertIn({"value": ".", "label": "Entire catalog"}, options)
 
     def test_field_select_options_have_nonempty_values(self):
         with tempfile.TemporaryDirectory() as root:
@@ -211,6 +231,15 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": {"mappings": []}})
         self.assertEqual(result["status"], "partial")
         self.assertIn("channel 44", result["message"])
+
+    def test_manual_match_keeps_saved_mappings_despite_filters(self):
+        settings = {"mappings": [{"channel": "1", "logo": "tv_logos:countries/us/a.png"}],
+                    "catalog_filters": [{"mode": "include_contains", "text": "canada"}]}
+        with patch("src.group_options", return_value=[]), \
+             patch("src.apply_mappings", return_value={"applied": 1, "skipped": 0, "errors": []}) as apply:
+            result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings})
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(apply.call_args.args[1], settings["mappings"])
 
     def test_automatic_action_reports_details(self):
         report = {"applied": 0, "skipped": 1, "failed": 0, "configuration_errors": [],

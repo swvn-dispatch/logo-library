@@ -6,6 +6,7 @@ from src.automatic_run import run_automatic
 
 class Catalog:
     id = "tv_logos"
+    accepts_legacy_paths = True
 
     def __init__(self):
         self.reads = 0
@@ -122,3 +123,48 @@ class AutomaticRunTests(unittest.TestCase):
         self.assertEqual(result["applied"], 1)
         self.assertEqual(result["channels"][0]["method"], "station_name")
         self.assertEqual(self.calls[0][5], "tv_logos:countries/canada/local/cbc-toronto-cblt-ca.png")
+
+    def test_entire_catalog_respects_include_filters(self):
+        self.settings["automatic_groups"][0]["scope"] = "."
+        self.catalog.options = lambda data_dir: ["countries/united-states/abc-us.png", "countries/canada/abc-ca.png"]
+        self.settings["catalog_filters"] = [{"mode": "include_starts_with", "text": "countries/canada/"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(self.calls[0][5], "tv_logos:countries/canada/abc-ca.png")
+        self.assertEqual(self.calls[0][4]["catalog_filters"], self.settings["catalog_filters"])
+
+    def test_excluded_logos_do_not_match_even_when_scope_has_other_logos(self):
+        self.settings["catalog_filters"] = [{"mode": "exclude_contains", "text": "abc"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(result["channels"][0]["reason"], "no_match")
+        self.assertEqual(self.calls, [])
+
+    def test_include_and_exclude_filters_apply_before_variant_resolution(self):
+        self.settings["automatic_groups"][0]["scope"] = "."
+        self.catalog.options = lambda data_dir: ["countries/united-states/abc-us.png",
+                                                 "countries/united-states/abc-hd-us.png",
+                                                 "countries/canada/abc-ca.png"]
+        self.settings["catalog_filters"] = [
+            {"mode": "include_starts_with", "text": "countries/united-states/"},
+            {"mode": "exclude_contains", "text": "-hd-"},
+        ]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(self.calls[0][5], "tv_logos:countries/united-states/abc-us.png")
+
+    def test_filtered_out_scope_reports_configuration_error(self):
+        self.settings["catalog_filters"] = [{"mode": "include_contains", "text": "canada"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertIn("after catalog filters", result["configuration_errors"][0])
+        self.assertEqual(result["channels"], [])
+
+    def test_invalid_filters_do_not_widen_automatic_matching(self):
+        for row in ({"mode": "exclude_regex", "text": "["},
+                    {"mode": "include_contains", "text": "us", "catalog": "missing"}):
+            with self.subTest(row=row):
+                self.settings["catalog_filters"] = [row]
+                result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+                self.assertEqual(result["applied"], 0)
+                self.assertTrue(result["configuration_errors"])
+                self.assertEqual(result["channels"], [])
+                self.assertEqual(self.calls, [])

@@ -5,6 +5,7 @@ from collections import Counter
 from .automatic import compile_groups
 from .callsign_matching import build_callsign_index, build_station_name_index
 from .catalog_scope import scoped_paths
+from .filters import catalog_filter_rules, matches
 from .matching_engine import build_network_index, match_channel
 from .name_matching import build_name_index
 
@@ -21,17 +22,23 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
         raise ValueError("Manual mappings must be a list")
     manual_ids = {str(row["channel"]) for row in manual if isinstance(row, dict)
                   and row.get("channel") not in (None, "")}
+    catalogs = tuple(catalogs)
     catalog_by_id = {catalog.id: catalog for catalog in catalogs}
     group_ids = {str(group) for group in group_ids}
     groups, errors = compile_groups(settings.get("automatic_groups", []), group_ids, catalog_by_id, settings)
+    filter_rules, filter_errors = catalog_filter_rules(settings.get("catalog_filters", []), catalogs)
+    if filter_errors:
+        errors.extend(f"Catalog filter: {error}" for error in filter_errors)
+        groups.clear()
     catalog_paths = {}
     for group_id, config in list(groups.items()):
         try:
             catalog = catalog_by_id[config["catalog"]]
             if catalog.id not in catalog_paths:
-                catalog_paths[catalog.id] = list(catalog.options(data_dir))
+                catalog_paths[catalog.id] = [path for path in catalog.options(data_dir)
+                                             if matches(path, filter_rules.get(catalog.id, []))]
             if not any(scoped_paths(catalog_paths[catalog.id], config["scope"])):
-                errors.append(f"Group {group_id}: path scope contains no indexed logos; check the catalog-relative directory and catalog index")
+                errors.append(f"Group {group_id}: path scope contains no indexed logos after catalog filters; check the directory, filters and catalog index")
                 del groups[group_id]
         except Exception as exc:
             errors.append(f"Group {group_id}: could not read catalog: {exc}")

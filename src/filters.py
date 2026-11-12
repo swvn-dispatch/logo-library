@@ -6,6 +6,16 @@ MATCH_TYPES = ("contains", "starts_with", "exact", "regex")
 MODES = tuple(f"{operation}_{kind}" for operation in ("include", "exclude") for kind in MATCH_TYPES)
 
 
+def catalog_filter_rules(rows, catalogs):
+    """Compile filters using the same catalog defaults for settings and runs."""
+    catalog_ids = {catalog.id for catalog in catalogs}
+    legacy = [catalog.id for catalog in catalogs if getattr(catalog, "accepts_legacy_paths", False)]
+    rules, errors = compile_filters(rows, legacy[0] if len(legacy) == 1 else None)
+    for catalog_id in sorted(set(rules) - catalog_ids):
+        errors.append(f"Unknown catalog in filters: {catalog_id}.")
+    return rules, errors
+
+
 def _compile_regex(pattern):
     """Compile a case-insensitive Python regular expression."""
     try:

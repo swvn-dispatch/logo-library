@@ -1,6 +1,7 @@
 """Validation for group-scoped automatic matching configuration."""
 
 from collections import Counter
+from copy import deepcopy
 from pathlib import PurePosixPath
 import re
 
@@ -131,7 +132,8 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
                                "scope": "" if str(path) == "." else str(path), "replace": bool(replace),
                                "prefix": prefix, "prefix_mode": prefix_mode,
                                "variant": variant, "generic_fallback": generic, "guide_signals": guide,
-                               "threshold": threshold}
+                               "threshold": threshold,
+                               "catalog_filters": deepcopy(settings.get("catalog_filters", []))}
         except ValueError as exc:
             errors.append(f"Row {index}: {exc}")
     return compiled, errors

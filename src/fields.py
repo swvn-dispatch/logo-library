@@ -4,7 +4,7 @@ import logging
 from pathlib import PurePosixPath
 
 from . import catalogs
-from .filters import MATCH_TYPES, compile_filters, matches
+from .filters import MATCH_TYPES, catalog_filter_rules, matches
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,7 @@ def _valid_text(value):
 
 
 def make_fields(data_dir, settings, channels, groups=()):
-    legacy_catalogs = [catalog.id for catalog in catalogs.CATALOGS if getattr(catalog, "accepts_legacy_paths", False)]
-    default_catalog = legacy_catalogs[0] if len(legacy_catalogs) == 1 else None
-    rules, filter_errors = compile_filters(settings.get("catalog_filters", []), default_catalog)
+    rules, filter_errors = catalog_filter_rules(settings.get("catalog_filters", []), catalogs.CATALOGS)
     logo_options = []
     all_logos = {}
     directories = set()
@@ -32,10 +30,10 @@ def make_fields(data_dir, settings, channels, groups=()):
                 value, label = f"{catalog.id}:{path}", f"{catalog.label} / {path}"
                 if _valid_text(path) and _valid_text(value) and _valid_text(label):
                     all_logos[value] = label
-                    if len(catalogs.CATALOGS) == 1:
-                        directories.update(str(parent) for parent in PurePosixPath(path).parents if str(parent) != ".")
                     if matches(path, rules.get(catalog.id, [])):
                         logo_options.append({"value": value, "label": label})
+                        if len(catalogs.CATALOGS) == 1:
+                            directories.update(str(parent) for parent in PurePosixPath(path).parents if str(parent) != ".")
                 else:
                     logger.warning("Skipping invalid logo option from catalog %s", catalog.id)
         except (OSError, ValueError):
@@ -75,7 +73,7 @@ def make_fields(data_dir, settings, channels, groups=()):
     ]
     saved_scopes = {row.get("scope") for row in group_rows if isinstance(row, dict)
                     and isinstance(row.get("scope"), str) and row.get("scope") not in ("", ".")} if isinstance(group_rows, list) else set()
-    scope_options.extend({"value": path, "label": f"Unavailable: {path}"}
+    scope_options.extend({"value": path, "label": f"Unavailable or filtered: {path}"}
                          for path in sorted(saved_scopes - directories))
     unavailable_groups = set()
     if isinstance(group_rows, list):
@@ -104,7 +102,7 @@ def make_fields(data_dir, settings, channels, groups=()):
         {"id": "automatic_strategy_help", "type": "info", "section": "automatic_assignment",
          "description": "Strategy: use Standard. Choose Standard + fuzzy only if Standard misses channels and you are willing to review possible false matches. Disabled skips the group."},
         {"id": "automatic_scope_help", "type": "info", "section": "automatic_assignment",
-         "description": "Path scope: select a catalog directory, or leave blank to search the entire catalog. Unavailable saved paths cannot be matched."},
+         "description": "Path scope: select a catalog directory, or leave blank to search all filtered logos. Unavailable or filtered saved paths cannot be matched."},
         {"id": "automatic_replace_help", "type": "info", "section": "automatic_assignment",
          "description": "Replace: allow matching to replace a channel's effective logo. Manual mappings always take priority."},
         *([{"id": "automatic_missing_groups", "type": "info", "section": "automatic_assignment",
@@ -155,9 +153,9 @@ def make_fields(data_dir, settings, channels, groups=()):
          "description": "Use a station call sign from the guide ID only when the channel name agrees on the network. Guide IDs can be stale or change; network agreement cannot verify the city."},
         {"id": "catalog_filters_section", "type": "section", "label": "Catalog filters", "collapsed": True},
         {"id": "catalog_filter_instructions", "type": "info", "section": "catalog_filters_section",
-         "description": "Filters match full paths without regard to case. Include any matching path, then exclude matches. Save and reload the plugin to update choices. Saved mappings remain available."},
+         "description": "Filters match full paths without regard to case. They limit logo choices, Auto Match scopes and candidates. Save and reload to update choices. Saved manual mappings remain available."},
         *([{"id": "catalog_filter_errors", "type": "info", "section": "catalog_filters_section",
-            "label": "Ignored filters", "description": " ".join(filter_errors)}] if filter_errors else []),
+            "label": "Filter errors", "description": " ".join(filter_errors) + " Auto Match will not run until these are corrected."}] if filter_errors else []),
         {"id": "catalog_filters", "type": "table", "section": "catalog_filters_section", "label": "Filters", "default": [],
          "columns": [
              # Add a catalog select when multiple catalogs are available in the UI.

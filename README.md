@@ -46,10 +46,11 @@ the action result for skipped channels and failures. Channels outside enabled gr
 omitted from the results and skip counts. Invalid group configurations are
 still reported. Catalog updates do not trigger matching.
 
-The directory selector lists paths from the catalog index. A saved path that is
-no longer available remains visible, but an empty scope produces a configuration
-error rather than a series of misleading `no_match` results. Select **Entire
-catalog**, or leave an override scope blank, to search the entire catalog.
+The directory selector lists paths from the filtered catalog index. A saved path
+that is no longer available remains visible, but an empty scope produces a
+configuration error rather than a series of misleading `no_match` results.
+Select **Entire catalog**, or leave the scope blank, to search all logos that
+pass the catalog filters.
 
 The collapsed **Advanced matching** section contains optional prefix, fuzzy
 threshold and variant controls. The shared prefix may be literal or Python
@@ -115,21 +116,25 @@ is a similarity measure, not a probability that an assignment is correct.
 
 ## Catalog filters
 
-Use the collapsed **Catalog filters** section to narrow the logo choices in the
-mapping table. Filters currently apply to TV Logos. Each row selects an include
-or exclude mode and text to match against the full catalog-relative path.
+Use the collapsed **Catalog filters** section to narrow manual logo choices,
+automatic scope choices and Auto Match candidates. Filters currently apply to
+TV Logos. Each row selects an include or exclude mode and text to match against
+the full catalog-relative path.
 Contains, starts with, exact, and regex modes are case-insensitive. For example,
 an **Include contains** row with `canada` shows matching paths.
 
 When there are include rows, a path must match at least one of them. Any matching
 exclude row removes it from the choices. Without include rows, all paths are
-included before exclusions. Existing mapped logos remain selectable even when
-filtered out. Save the settings, reload the plugin, and reopen its settings to
-refresh the choices.
+included before exclusions. Filters also apply when **Entire catalog** is
+selected. Existing manual mappings remain selectable and can be applied even
+when filtered out. Save the settings, reload the plugin, and reopen its settings
+to refresh the choices. Auto Match rechecks filter settings before assignment.
 
 Regex uses Python's regular expression syntax. Invalid or incomplete rows are
-ignored and reported in the filter section after reload. Avoid expressions that
-cause excessive backtracking, as they can stall the settings page.
+reported in the filter section after reload. Auto Match does not run until
+filter errors are corrected, preventing an invalid filter from widening the
+candidate set. Manual choices ignore invalid filter rows. Avoid expressions that
+cause excessive backtracking, as they can stall matching or the settings page.
 
 ## Manual assignment
 
