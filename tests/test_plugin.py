@@ -64,6 +64,10 @@ class PluginTests(unittest.TestCase):
         self.assertNotIn("automatic_prefix_rules", by_id)
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
                          ["group", "strategy", "scope", "replace"])
+        strategy_options = by_id["automatic_groups"]["columns"][1]["options"]
+        self.assertEqual([(option["value"], option["label"]) for option in strategy_options], [
+            ("disabled", "Disabled"), ("exact", "Standard"), ("fuzzy", "Standard + fuzzy"),
+        ])
         self.assertEqual(by_id["automatic_threshold"]["default"], 90)
         self.assertEqual(by_id["automatic_groups"]["columns"][-1]["label"], "Replace")
         self.assertEqual(by_id["automatic_variant"]["default"], "strict")
@@ -80,6 +84,14 @@ class PluginTests(unittest.TestCase):
         by_id = {field["id"]: field for field in fields}
         self.assertEqual(by_id["automatic_prefix_rules"]["section"], "automatic_advanced")
         self.assertIn("Remove all rows", by_id["automatic_prefix_help"]["description"])
+
+    def test_saved_station_strategy_remains_selectable(self):
+        with tempfile.TemporaryDirectory() as root:
+            settings = {"automatic_groups": [{"group": "1", "strategy": "callsign"}]}
+            fields = make_fields(root, settings, [], [{"value": "1", "label": "Locals"}])
+        table = next(field for field in fields if field["id"] == "automatic_groups")
+        options = table["columns"][1]["options"]
+        self.assertIn({"value": "callsign", "label": "Standard (legacy station hint)"}, options)
 
     def test_legacy_shared_groups_do_not_add_controls_or_notices(self):
         settings = {"automatic_default_groups": ["1", "2"],

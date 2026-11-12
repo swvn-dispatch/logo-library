@@ -67,6 +67,9 @@ def make_fields(data_dir, settings, channels, groups=()):
     group_options = list(groups)
     group_ids = {option["value"] for option in group_options}
     group_rows = settings.get("automatic_groups", [])
+    has_legacy_callsign = isinstance(group_rows, list) and any(
+        isinstance(row, dict) and row.get("strategy") == "callsign" for row in group_rows
+    )
     scope_options = [{"value": ".", "label": "Entire catalog"}] + [
         {"value": path, "label": path} for path in sorted(directories, key=str.casefold)
     ]
@@ -99,7 +102,7 @@ def make_fields(data_dir, settings, channels, groups=()):
         {"id": "automatic_group_help", "type": "info", "section": "automatic_assignment",
          "description": "Channel group: select a group currently used by a channel."},
         {"id": "automatic_strategy_help", "type": "info", "section": "automatic_assignment",
-         "description": "Strategy: Disabled skips the group. Enabled strategies use scoped exact names and station evidence; fuzzy additionally permits similarity fallback."},
+         "description": "Strategy: use Standard. Choose Standard + fuzzy only if Standard misses channels and you are willing to review possible false matches. Disabled skips the group."},
         {"id": "automatic_scope_help", "type": "info", "section": "automatic_assignment",
          "description": "Path scope: select a catalog directory, or leave blank to search the entire catalog. Unavailable saved paths cannot be matched."},
         {"id": "automatic_replace_help", "type": "info", "section": "automatic_assignment",
@@ -111,9 +114,9 @@ def make_fields(data_dir, settings, channels, groups=()):
              {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
              {"id": "strategy", "label": "Strategy", "type": "select", "options": [
                  {"value": "disabled", "label": "Disabled"},
-                 {"value": "exact", "label": "Normalized name"},
-                 {"value": "callsign", "label": "Station call sign"},
-                 {"value": "fuzzy", "label": "Fuzzy name"},
+                 {"value": "exact", "label": "Standard"},
+                 *([{"value": "callsign", "label": "Standard (legacy station hint)"}] if has_legacy_callsign else []),
+                 {"value": "fuzzy", "label": "Standard + fuzzy"},
              ]},
              # Restore the catalog column and selection logic when more catalogs are added.
              # {"id": "catalog", "label": "Catalog", "type": "select", "options": [...]},
@@ -138,7 +141,7 @@ def make_fields(data_dir, settings, channels, groups=()):
          "description": "Previously saved group prefix rules still override the shared prefix. Remove all rows to use the shared prefix for every group."}] if settings.get("automatic_prefix_rules") else []),
         {"id": "automatic_threshold", "type": "number", "section": "automatic_advanced",
          "label": "Fuzzy threshold (%)", "default": 90,
-         "description": "Shared by all fuzzy-name groups. Scores must be strictly above this value; 100 cannot match."},
+         "description": "Used by all Standard + fuzzy groups. Scores must be strictly above this value; 100 cannot match."},
         {"id": "automatic_variant", "type": "select", "section": "automatic_advanced",
          "label": "Logo variant preference", "default": "strict", "options": [
              {"value": "strict", "label": "Skip ambiguous variants"},

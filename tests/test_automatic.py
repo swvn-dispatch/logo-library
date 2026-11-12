@@ -20,6 +20,11 @@ class AutomaticGroupTests(unittest.TestCase):
                 self.assertEqual(errors, [])
                 self.assertEqual(groups["1"]["scope"], "")
 
+    def test_legacy_station_strategy_remains_enabled(self):
+        groups, errors = compile_groups([{"group": "1", "strategy": "callsign"}], [1], {"tv"})
+        self.assertEqual(errors, [])
+        self.assertEqual(groups["1"]["strategy"], "callsign")
+
     def test_duplicates_and_missing_groups_are_rejected(self):
         row = {"group": "1", "strategy": "exact", "catalog": "tv"}
         groups, errors = compile_groups([row, row, {"group": "9"}], [1], {"tv"})

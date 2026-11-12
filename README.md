@@ -64,8 +64,8 @@ Enabled groups use a layered matcher. It looks for exact normalized names,
 station-specific call signs, and exact name components separated by a pipe or
 spaced dash, regardless of any country prefix. Distinct strong candidates are
 reported as conflicts. The strategy choice controls fuzzy fallback: selecting
-fuzzy enables it after the stronger evidence fails; the other enabled choices
-use only stronger evidence. The result records the method used.
+**Standard + fuzzy** enables it after the stronger evidence fails; Standard
+uses only stronger evidence. The result records the method used.
 
 The normalized-name matcher uses Unicode normalization,
 case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
