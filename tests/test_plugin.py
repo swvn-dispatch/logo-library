@@ -45,8 +45,8 @@ class PluginTests(unittest.TestCase):
             fields = make_fields(root, {}, [])
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
-            "automatic_assignment", "automatic_coming_soon", "automatic_group_help", "automatic_strategy_help",
-            "automatic_scope_help", "automatic_replace_help", "automatic_groups", "automatic_advanced", "automatic_prefix",
+            "automatic_assignment", "automatic_setup_help", "automatic_scope_help", "automatic_replace_help",
+            "automatic_skipped_help", "automatic_groups", "automatic_advanced", "automatic_prefix",
             "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
@@ -57,13 +57,17 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["manual_instructions"]["section"], "manual_assignment")
         self.assertEqual(by_id["mappings"]["section"], "manual_assignment")
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
-        self.assertEqual(by_id["automatic_coming_soon"]["section"], "automatic_assignment")
-        self.assertIn("Groups without an enabled row are skipped", by_id["automatic_coming_soon"]["description"])
+        self.assertEqual(by_id["automatic_setup_help"]["section"], "automatic_assignment")
+        self.assertIn("Groups without an enabled row are skipped", by_id["automatic_setup_help"]["description"])
+        self.assertIn("Catalog filters still apply", by_id["automatic_scope_help"]["description"])
+        self.assertIn("Saved manual mappings always take priority", by_id["automatic_replace_help"]["description"])
+        self.assertIn("possible false matches", by_id["automatic_skipped_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
         self.assertNotIn("automatic_prefix_rules", by_id)
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
                          ["group", "strategy", "scope", "replace"])
+        self.assertEqual(by_id["automatic_groups"]["columns"][0]["label"], "Group")
         strategy_options = by_id["automatic_groups"]["columns"][1]["options"]
         self.assertEqual([(option["value"], option["label"]) for option in strategy_options], [
             ("disabled", "Disabled"), ("exact", "Standard"), ("fuzzy", "Standard + fuzzy"),
