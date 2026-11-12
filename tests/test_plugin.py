@@ -121,6 +121,8 @@ class PluginTests(unittest.TestCase):
         self.assertIn({"value": "hd", "label": "Prefer HD variant"}, by_id["automatic_variant"]["options"])
         self.assertFalse(by_id["automatic_generic_fallback"]["default"])
         self.assertFalse(by_id["automatic_guide_signals"]["default"])
+        self.assertEqual(by_id["automatic_guide_signals"]["label"], "Use channel TVG ID as a station hint")
+        self.assertIn("not its matched EPG entry", by_id["automatic_guide_signals"]["description"])
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
         self.assertTrue(by_id["scheduled_tasks"]["collapsed"])
         self.assertEqual(by_id["schedule_automatic_mode"]["default"], "disabled")

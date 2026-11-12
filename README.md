@@ -62,9 +62,11 @@ Logo variant preference can prefer a standard or HD logo within a recognized
 variant family. Prefer HD falls back to a standard logo when no HD variant is
 available. Multiple HD variants or other unresolved ties are skipped.
 
-**Use guide IDs as a station hint** and **Allow generic network logos** are off
-by default. Guide IDs may be stale and cannot verify a station's city. A generic
-network logo is a substitute, not a confirmed station-specific logo.
+**Use channel TVG ID as a station hint** and **Allow generic network logos** are
+off by default. The station hint reads the channel's TVG ID, using its override
+when set, not the matched EPG entry. TVG IDs may be stale and cannot verify a
+station's city. A generic network logo is a substitute, not a confirmed
+station-specific logo.
 
 ## Manual assignment
 
