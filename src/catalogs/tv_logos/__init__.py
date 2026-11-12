@@ -14,9 +14,9 @@ class TvLogosCatalog:
     accepts_legacy_paths = True
     actions = [{
         "id": "update_catalog",
-        "label": "Refresh tv-logos",
+        "label": "Refresh tv-logos downloaded catalog",
         "description": "Download the latest tv-logos catalog.",
-        "button_label": "Refresh tv-logos",
+        "button_label": "Refresh",
         "button_color": "teal",
         "async": True,
     }]

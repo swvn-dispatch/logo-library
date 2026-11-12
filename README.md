@@ -84,7 +84,7 @@ Includes are combined; any matching exclusion removes a path. Saved manual
 mappings remain available even if filtered out. Invalid filter settings stop
 Auto Match until corrected.
 
-Use **Refresh tv-logos** to download the latest catalog. Save settings, reload
+Use **Refresh tv-logos downloaded catalog** to download the latest catalog. Save settings, reload
 the plugin and reopen its settings to refresh choices after changing filters or
 updating the catalog. Catalog updates do not automatically assign logos.
 Dispatcharr caches field options per process, so confirm that settings saved
@@ -108,7 +108,7 @@ map its logos to channels within Dispatcharr. Refer to the upstream project's
 README for attribution and usage terms.
 
 The catalog is downloaded locally when the plugin is enabled. Use
-**Refresh tv-logos** to refresh it. The current and previous snapshots are
+**Refresh tv-logos downloaded catalog** to refresh it. The current and previous snapshots are
 retained, and updates need temporary space for the archive and extracted images.
 Logo choices come from a cached index rather than a filesystem scan at worker
 startup. Existing installations build a missing index in the background. Reload

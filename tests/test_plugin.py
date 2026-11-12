@@ -27,7 +27,8 @@ class PluginTests(unittest.TestCase):
         for action in declared:
             self.assertEqual(manifest_actions[action["id"]], action)
         self.assertEqual(manifest_actions["update_catalog"]["button_color"], "teal")
-        self.assertEqual(manifest_actions["update_catalog"]["button_label"], "Refresh tv-logos")
+        self.assertEqual(manifest_actions["update_catalog"]["button_label"], "Refresh")
+        self.assertEqual(manifest_actions["ignore_skipped"]["button_label"], "Ignore")
         self.assertEqual(manifest_actions["apply_changes"]["button_label"], "Manual Match")
         self.assertEqual(manifest_actions["run_automatic"]["button_label"], "Auto Match")
 
