@@ -72,6 +72,9 @@ def make_fields(data_dir, settings, channels, groups=()):
     ]
     saved_scopes = {row.get("scope") for row in group_rows if isinstance(row, dict)
                     and isinstance(row.get("scope"), str) and row.get("scope") not in ("", ".")} if isinstance(group_rows, list) else set()
+    default_scope = settings.get("automatic_default_scope")
+    if isinstance(default_scope, str) and default_scope not in ("", "."):
+        saved_scopes.add(default_scope)
     scope_options.extend({"value": path, "label": f"Unavailable: {path}"}
                          for path in sorted(saved_scopes - directories))
     unavailable_groups = set()
@@ -95,18 +98,29 @@ def make_fields(data_dir, settings, channels, groups=()):
          ]},
         {"id": "automatic_assignment", "type": "section", "label": "Automatic assignment", "collapsed": False},
         {"id": "automatic_coming_soon", "type": "info", "section": "automatic_assignment",
-         "description": "Configure one row per group and save before running Auto Match. Groups without an enabled row are skipped. Saved manual mappings take priority."},
+         "description": "Select groups for shared settings. Optional group rows below override shared settings, including Disabled. Save before running Auto Match. Saved manual mappings take priority."},
+        {"id": "automatic_default_groups", "type": "multiselect", "section": "automatic_assignment",
+         "label": "Groups using shared settings", "default": [], "options": group_options},
+        {"id": "automatic_default_strategy", "type": "select", "section": "automatic_assignment",
+         "label": "Shared strategy", "default": "exact", "options": [
+             {"value": "exact", "label": "Exact evidence"},
+             {"value": "callsign", "label": "Station hint"},
+             {"value": "fuzzy", "label": "Include fuzzy matching"}]},
+        {"id": "automatic_default_scope", "type": "select", "section": "automatic_assignment",
+         "label": "Shared catalog scope", "default": ".", "options": scope_options},
+        {"id": "automatic_default_replace", "type": "boolean", "section": "automatic_assignment",
+         "label": "Replace existing logos for shared groups", "default": False},
         {"id": "automatic_group_help", "type": "info", "section": "automatic_assignment",
          "description": "Channel group: select a group currently used by a channel."},
         {"id": "automatic_strategy_help", "type": "info", "section": "automatic_assignment",
-         "description": "Strategy: select Disabled, normalized name, station call sign, or fuzzy name."},
+         "description": "Strategy: Disabled skips the group. Enabled strategies use scoped exact names and station evidence; fuzzy additionally permits similarity fallback."},
         {"id": "automatic_scope_help", "type": "info", "section": "automatic_assignment",
          "description": "Path scope: select a catalog directory, or leave blank to search the entire catalog. Unavailable saved paths cannot be matched."},
         {"id": "automatic_replace_help", "type": "info", "section": "automatic_assignment",
          "description": "Replace: allow matching to replace a channel's effective logo. Manual mappings always take priority."},
         *([{"id": "automatic_missing_groups", "type": "info", "section": "automatic_assignment",
             "label": "Unavailable saved groups", "description": "These saved group IDs are not currently used by channels: " + ", ".join(sorted(unavailable_groups)) + ". They are not selectable or active."}] if unavailable_groups else []),
-        {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
+        {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group overrides", "default": [],
          "columns": [
              {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
              {"id": "strategy", "label": "Strategy", "type": "select", "options": [
@@ -120,26 +134,36 @@ def make_fields(data_dir, settings, channels, groups=()):
              {"id": "scope", "label": "Path scope", "type": "select", "options": scope_options},
              {"id": "replace", "label": "Replace", "type": "boolean"},
          ]},
-        {"id": "automatic_prefix", "type": "string", "section": "automatic_assignment",
+        {"id": "automatic_advanced", "type": "section", "label": "Advanced matching", "collapsed": True},
+        {"id": "automatic_prefix", "type": "string", "section": "automatic_advanced",
          "label": "Name prefix to remove", "default": "",
-         "description": "Default literal prefix for name strategies. A group-specific rule below overrides it."},
-        {"id": "automatic_prefix_rules", "type": "table", "section": "automatic_assignment",
+         "description": "Optional prefix removed from the start of channel names."},
+        {"id": "automatic_prefix_mode", "type": "select", "section": "automatic_advanced",
+         "label": "Prefix mode", "default": "literal", "options": [
+             {"value": "literal", "label": "Literal"}, {"value": "regex", "label": "Regex"}],
+         "description": "Regex is matched at the start of the name. Avoid patterns with excessive backtracking."},
+        *([{"id": "automatic_prefix_rules", "type": "table", "section": "automatic_advanced",
          "label": "Group-specific name prefixes", "default": [], "columns": [
              {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
              {"id": "mode", "label": "Mode", "type": "select", "options": [
                  {"value": "literal", "label": "Literal"}, {"value": "regex", "label": "Regex"}]},
              {"id": "prefix", "label": "Prefix", "type": "string"},
-         ]},
-        {"id": "automatic_prefix_help", "type": "info", "section": "automatic_assignment",
-         "description": "Group rules override the default prefix for name strategies. Regex uses Python syntax and only matches at the start. Avoid patterns with excessive backtracking. Duplicate rules disable matching for that group."},
-        {"id": "automatic_threshold", "type": "number", "section": "automatic_assignment",
+         ]}, {"id": "automatic_prefix_help", "type": "info", "section": "automatic_advanced",
+         "description": "Previously saved group prefix rules still override the shared prefix. Remove all rows to use the shared prefix for every group."}] if settings.get("automatic_prefix_rules") else []),
+        {"id": "automatic_threshold", "type": "number", "section": "automatic_advanced",
          "label": "Fuzzy threshold (%)", "default": 90,
          "description": "Shared by all fuzzy-name groups. Scores must be strictly above this value; 100 cannot match."},
-        {"id": "automatic_variant", "type": "select", "section": "automatic_assignment",
+        {"id": "automatic_variant", "type": "select", "section": "automatic_advanced",
          "label": "Logo variant preference", "default": "strict", "options": [
              {"value": "strict", "label": "Skip ambiguous variants"},
              {"value": "standard", "label": "Prefer standard variant"}],
          "description": "Prefer standard selects an unmarked logo only when all candidates belong to the same recognized HD or horizontal variant family; other ties are skipped."},
+        {"id": "automatic_generic_fallback", "type": "boolean", "section": "automatic_advanced",
+         "label": "Allow generic network logos", "default": False,
+         "description": "For unmatched channels with an explicit station call sign, allow an exact network name to stand in for the station. This may assign the same network logo to multiple cities; manual mappings still take priority."},
+        {"id": "automatic_guide_signals", "type": "boolean", "section": "automatic_advanced",
+         "label": "Use guide IDs as a station hint", "default": False,
+         "description": "Use a station call sign from the guide ID only when the channel name agrees on the network. Guide IDs can be stale or change; network agreement cannot verify the city."},
         {"id": "catalog_filters_section", "type": "section", "label": "Catalog filters", "collapsed": True},
         {"id": "catalog_filter_instructions", "type": "info", "section": "catalog_filters_section",
          "description": "Filters match full paths without regard to case. Include any matching path, then exclude matches. Save and reload the plugin to update choices. Saved mappings remain available."},

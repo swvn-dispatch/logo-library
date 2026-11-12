@@ -94,11 +94,12 @@ def automatic_channels():
     from apps.channels.models import Channel
 
     return [{"id": channel.id, "name": channel.effective_name,
-             "group_id": channel.effective_channel_group_id, "logo_id": channel.effective_logo_id}
+             "group_id": channel.effective_channel_group_id, "logo_id": channel.effective_logo_id,
+             "guide_id": channel.effective_tvg_id}
             for channel in with_effective_values(Channel.objects.all())]
 
 
-def guarded_assign_logo(code_dir, channel_id, group_id, name, expected, identity, image):
+def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected, identity, image):
     """Recheck saved settings and effective values in the assignment transaction."""
     from django.db import transaction
     from apps.channels.models import Channel, ChannelGroup, ChannelOverride
@@ -134,6 +135,8 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, expected, identity
             return override_value if override_value is not None else getattr(channel, field)
 
         if str(effective("channel_group_id")) != group_id or effective("name") != name:
+            return "channel_changed"
+        if expected["guide_signals"] and effective("tvg_id") != guide_id:
             return "channel_changed"
         if effective("logo_id") is not None and not expected["replace"]:
             return "existing_logo"

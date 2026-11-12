@@ -70,3 +70,26 @@ class AutomaticGroupTests(unittest.TestCase):
         groups, errors = compile_groups(rows, [1, 2], {"tv"}, settings)
         self.assertNotIn("1", groups)
         self.assertIn("Invalid prefix regex", errors[0])
+
+    def test_shared_groups_and_explicit_overrides(self):
+        settings = {"automatic_default_groups": ["1", "2", "3", "4"],
+                    "automatic_default_scope": "countries/canada", "automatic_default_replace": True}
+        rows = [{"group": "2", "strategy": "exact", "scope": "countries/us", "replace": False},
+                {"group": "3", "strategy": "disabled"},
+                {"group": "4", "strategy": "invalid"}]
+        groups, errors = compile_groups(rows, [1, 2, 3, 4], {"tv"}, settings)
+        self.assertEqual(groups["1"]["scope"], "countries/canada")
+        self.assertTrue(groups["1"]["replace"])
+        self.assertEqual(groups["2"]["scope"], "countries/us")
+        self.assertFalse(groups["2"]["replace"])
+        self.assertNotIn("3", groups)
+        self.assertNotIn("4", groups)
+        self.assertEqual(len(errors), 1)
+
+    def test_shared_prefix_regex_and_guide_opt_in(self):
+        settings = {"automatic_default_groups": ["1"], "automatic_prefix": r"^US\s*\|\s*",
+                    "automatic_prefix_mode": "regex", "automatic_guide_signals": True}
+        groups, errors = compile_groups([], [1], {"tv"}, settings)
+        self.assertEqual(errors, [])
+        self.assertTrue(groups["1"]["guide_signals"])
+        self.assertEqual(groups["1"]["prefix_mode"], "regex")

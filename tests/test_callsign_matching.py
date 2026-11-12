@@ -36,7 +36,7 @@ class CallSignTests(unittest.TestCase):
                  "countries/united-states/us-local/cw/cw-7-wabc-us.png"]
         index = build_callsign_index(paths, "tv_logos", "countries/united-states/us-local/cw")
         self.assertEqual(match_callsign("WABC", index)["path"], paths[3])
-        self.assertEqual(match_callsign("CITY", build_callsign_index(paths, "tv_logos"))["reason"], "no_callsign")
+        self.assertEqual(match_callsign("CITY", build_callsign_index(paths, "tv_logos"))["reason"], "no_match")
         self.assertEqual(match_callsign("WABC", build_callsign_index(paths, "other"))["reason"], "no_match")
         self.assertEqual(match_callsign("WABC", build_callsign_index(paths, "tv_logos", "countries/united-states/us"))["reason"], "no_match")
 

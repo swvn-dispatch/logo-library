@@ -30,31 +30,41 @@ logos do not depend on the plugin being enabled or on a catalog being reachable.
 - Use **Manual Match** to refresh assigned copies after catalog updates.
 
 Automatic assignment runs only when explicitly requested. Under **Automatic
-assignment**, add and save a row for each group to enable, select a strategy
-and optional directory scope, then run **Auto Match**. Only groups
+assignment**, select groups that share a strategy, catalog scope and replacement
+policy, then save and run **Auto Match**. Optional group override rows take
+precedence over the shared settings, even when an override disables a group or
+is invalid. Existing per-group rows remain overrides. Only groups
 used by channels are selectable, using their effective group assignments. The
 sole registered catalog is selected automatically; matching is disabled if
 multiple catalogs are registered until catalog selection is available.
-Groups without a valid enabled row are skipped. Saved manual mappings always
+Groups without a valid enabled configuration are skipped. Saved manual mappings always
 take precedence, including incomplete mappings with a channel selected. By
-default, channels with an effective logo are skipped; select **Replace** for a
-group to allow replacement. Review the action result for skipped
-channels and failures. Channels outside enabled group configurations are
+default, channels with an effective logo are skipped; enable replacement in the
+shared settings or select **Replace** in a group override to allow it. Review
+the action result for skipped channels and failures. Channels outside enabled group configurations are
 omitted from the results and skip counts. Invalid group configurations are
 still reported. Catalog updates do not trigger matching.
 
 The directory selector lists paths from the catalog index. A saved path that is
 no longer available remains visible, but an empty scope produces a configuration
-error rather than a series of misleading `no_match` results. Leave the scope
-blank to search the entire catalog.
+error rather than a series of misleading `no_match` results. Select **Entire
+catalog**, or leave an override scope blank, to search the entire catalog.
 
-The default name prefix and fuzzy threshold are shared settings below the group
-table. Add a group-specific prefix rule to override the default for a group.
-Rules may be literal or Python regex; regex is matched only at the beginning of
-the channel name. Avoid expressions with excessive backtracking, which can stall
-the matching task. Invalid regex and duplicate group rules disable that group.
-Older prefix and threshold values in the main group table are ignored. The
-default fuzzy threshold is 90 percent.
+The collapsed **Advanced matching** section contains optional prefix, fuzzy
+threshold and variant controls. The shared prefix may be literal or Python
+regex; regex is matched only at the beginning of the channel name. Avoid
+expressions with excessive backtracking, which can stall the matching task.
+Previously saved group-specific prefix rules remain available in this section
+until removed and take precedence over the shared prefix. Invalid regex and
+duplicate group rules disable that group. Older prefix and threshold values in
+the main group table are ignored. The default fuzzy threshold is 90 percent.
+
+Enabled groups use a layered matcher. It looks for exact normalized names,
+station-specific call signs, and exact name components separated by a pipe or
+spaced dash, regardless of any country prefix. Distinct strong candidates are
+reported as conflicts. The strategy choice controls fuzzy fallback: selecting
+fuzzy enables it after the stronger evidence fails; the other enabled choices
+use only stronger evidence. The result records the method used.
 
 The normalized-name matcher uses Unicode normalization,
 case folding, punctuation removal, `&` to `and`, and `+` to `plus`.
@@ -67,12 +77,29 @@ as variants. Multiple matching paths are ambiguous by default. The optional
 candidates share a recognized HD or horizontal variant family. Other
 country suffixes remain part of the name until explicitly supported.
 
-The call-sign matcher only considers uppercase US-style `K` or
-`W` call signs in channel names and station-specific TV Logos paths under
-`countries/united-states/us-local`. The configured directory scope narrows those
-paths further. Multiple call signs or unresolved logo variants are skipped. This
-heuristic does not verify station identity and does not support Canadian call
-signs or guide metadata yet.
+The call-sign matcher considers uppercase US-style `K` or `W` call signs and
+Canadian `C` call signs in channel names. It only uses station-specific TV
+Logos directories `countries/united-states/us-local` and
+`countries/canada/local`, narrowed by the configured scope. A generic filename
+containing a call-sign-shaped word is not treated as station evidence. Multiple
+call signs or unresolved variants are skipped. This heuristic does not verify
+station identity.
+
+**Use guide IDs as a station hint** is off by default. When enabled, a guide
+ID may supply a call sign missing from the channel name, but only when it
+resolves to a station-specific catalog file and the channel name agrees with
+the network in that filename. The guide ID is checked again before assignment.
+Guide IDs can change or become stale: network agreement cannot distinguish two
+stations on the same network, so this option can still assign the wrong city.
+It never changes the saved manual mapping or uses guide IDs as a durable key.
+
+**Allow generic network logos** is off by default. When enabled, an unmatched
+channel with an explicit station call sign may use an exact generic network
+logo as a substitute for that local station. It requires a whole network-name
+prefix and preserves numbered variants, such as CTV and CTV 2. The match is
+reported as `network_fallback` and the action reports the number applied. This
+is a network-level substitute, not a verified station-specific logo. Manual
+mappings still take priority.
 
 The fuzzy matcher scores normalized names with Python's
 `SequenceMatcher` ratio, expressed as a percentage. A match must score strictly

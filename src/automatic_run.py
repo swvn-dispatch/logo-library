@@ -3,17 +3,17 @@
 from collections import Counter
 
 from .automatic import compile_groups
-from .callsign_matching import build_callsign_index, match_callsign
+from .callsign_matching import build_callsign_index
 from .catalog_scope import scoped_paths
-from .fuzzy_matching import match_fuzzy
-from .name_matching import build_name_index, match_name
+from .matching_engine import build_network_index, match_channel
+from .name_matching import build_name_index
 
 
 def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
     """Match a snapshot; assign must recheck eligibility under a write lock.
 
     The injected assign function receives (channel_id, group_id, channel_name,
-    group_config, logo_identity, image). It returns None on success or a skip
+    guide_id, group_config, logo_identity, image). It returns None on success or a skip
     reason if the channel or saved settings changed since the snapshot.
     """
     manual = settings.get("mappings", [])
@@ -56,27 +56,23 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
                 reason = "existing_logo"
             else:
                 catalog = catalog_by_id[config["catalog"]]
-                key = (catalog.id, config["scope"], config["strategy"] == "callsign")
+                key = (catalog.id, config["scope"])
                 if key not in indices:
                     paths = catalog_paths[catalog.id]
-                    indices[key] = (build_callsign_index(paths, catalog.id, config["scope"]) if key[2]
-                                    else build_name_index(paths, catalog.id, config["scope"]))
-                index = indices[key]
-                if config["strategy"] == "callsign":
-                    match = match_callsign(channel["name"], index, config["variant"], catalog.id)
-                elif config["strategy"] == "fuzzy":
-                    match = match_fuzzy(channel["name"], index, config["threshold"], config["prefix"],
-                                        config["prefix_mode"], config["variant"], catalog.id)
-                else:
-                    match = match_name(channel["name"], index, config["prefix"], config["prefix_mode"],
-                                       config["variant"], catalog.id)
+                    indices[key] = (build_name_index(paths, catalog.id, config["scope"]),
+                                    build_callsign_index(paths, catalog.id, config["scope"]),
+                                    build_network_index(paths, catalog.id, config["scope"]) if config["generic_fallback"] else None)
+                name_index, callsign_index, network_index = indices[key]
+                match = match_channel(channel["name"], config, name_index, callsign_index, catalog.id, network_index,
+                                      channel.get("guide_id"))
+                detail["method"] = match["method"]
                 if match.get("score") is not None:
                     detail["score"] = match["score"]
                 reason = match["reason"]
                 if reason is None:
                     identity = f"{catalog.id}:{match['path']}"
                     with catalog.resolve(data_dir, match["path"]) as image:
-                        reason = assign(channel_id, group_id, channel["name"], config, identity, image)
+                        reason = assign(channel_id, group_id, channel["name"], channel.get("guide_id"), config, identity, image)
                     if reason is None:
                         detail["logo"] = identity
             if reason is None:

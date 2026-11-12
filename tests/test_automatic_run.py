@@ -37,7 +37,7 @@ class AutomaticRunTests(unittest.TestCase):
                                  {"id": 2, "group_id": 1, "name": "News"}])
         self.assertEqual((result["applied"], result["skipped"], result["failed"]), (2, 0, 0))
         self.assertEqual(self.catalog.reads, 1)
-        self.assertEqual(self.calls[0][4], "tv_logos:countries/united-states/abc-us.png")
+        self.assertEqual(self.calls[0][5], "tv_logos:countries/united-states/abc-us.png")
 
     def test_skips_manual_existing_duplicate_and_no_match(self):
         self.settings["mappings"] = [{"channel": "1", "logo": ""}]
@@ -105,4 +105,11 @@ class AutomaticRunTests(unittest.TestCase):
         self.settings["automatic_prefix_rules"] = [{"group": "1", "mode": "regex", "prefix": r"^(?:US|CA)\s*\|\s*"}]
         result = self.run_match([{"id": 1, "group_id": 1, "name": "CA | ABC"}])
         self.assertEqual(result["applied"], 1)
-        self.assertEqual(self.calls[0][3]["prefix_mode"], "regex")
+        self.assertEqual(self.calls[0][4]["prefix_mode"], "regex")
+
+    def test_generic_fallback_is_guarded_and_reported(self):
+        self.settings["automatic_generic_fallback"] = True
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "US | ABC Chicago | WLS"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(result["channels"][0]["method"], "network_fallback")
+        self.assertTrue(self.calls[0][4]["generic_fallback"])

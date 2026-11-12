@@ -11,19 +11,20 @@ from src.dispatcharr import assign_logo, automatic_channels, channel_options, gr
 
 class DispatcharrTests(unittest.TestCase):
     def test_automatic_channel_snapshot_uses_effective_values(self):
-        row = types.SimpleNamespace(id=1, effective_name="Override", effective_channel_group_id=2, effective_logo_id=3)
+        row = types.SimpleNamespace(id=1, effective_name="Override", effective_channel_group_id=2, effective_logo_id=3, effective_tvg_id="ABC.us")
         models = types.ModuleType("apps.channels.models")
         models.Channel = MagicMock()
         managers = types.ModuleType("apps.channels.managers")
         managers.with_effective_values = MagicMock(return_value=[row])
         with patch.dict(sys.modules, {"apps": types.ModuleType("apps"), "apps.channels": types.ModuleType("apps.channels"),
                                       "apps.channels.models": models, "apps.channels.managers": managers}):
-            self.assertEqual(automatic_channels(), [{"id": 1, "name": "Override", "group_id": 2, "logo_id": 3}])
+            self.assertEqual(automatic_channels(), [{"id": 1, "name": "Override", "group_id": 2, "logo_id": 3, "guide_id": "ABC.us"}])
 
     def test_guard_rechecks_current_settings_and_effective_values(self):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
         expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
-                    "prefix": "", "prefix_mode": "literal", "variant": "strict", "threshold": 90}
+                    "prefix": "", "prefix_mode": "literal", "variant": "strict", "generic_fallback": False,
+                    "guide_signals": False, "threshold": 90}
         plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
         plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
         channel = types.SimpleNamespace(channel_group_id=8, name="Raw", logo_id=None)
@@ -44,7 +45,7 @@ class DispatcharrTests(unittest.TestCase):
                    "apps.plugins": types.ModuleType("apps.plugins"), "apps.plugins.models": plugin_models,
                    "apps.plugins.loader": loader}
         with patch.dict(sys.modules, modules), patch("src.dispatcharr.assign_logo") as assign:
-            args = ("/plugin", "1", "2", "Effective", expected, "tv_logos:a.png", Path("a.png"))
+            args = ("/plugin", "1", "2", "Effective", None, expected, "tv_logos:a.png", Path("a.png"))
             self.assertIsNone(guarded_assign_logo(*args))
             assign.assert_called_once()
             settings["mappings"] = [{"channel": "1"}]
@@ -65,6 +66,15 @@ class DispatcharrTests(unittest.TestCase):
             settings["automatic_variant"] = "standard"
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("automatic_variant")
+            settings["automatic_generic_fallback"] = True
+            self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+            settings.pop("automatic_generic_fallback")
+            settings["automatic_guide_signals"] = True
+            override.tvg_id = "WABC.us"
+            guide_args = ("/plugin", "1", "2", "Effective", "old.us", {**expected, "guide_signals": True},
+                          "tv_logos:a.png", Path("a.png"))
+            self.assertEqual(guarded_assign_logo(*guide_args), "channel_changed")
+            settings.pop("automatic_guide_signals")
             settings["automatic_groups"].append(dict(settings["automatic_groups"][0]))
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings["automatic_groups"].pop()

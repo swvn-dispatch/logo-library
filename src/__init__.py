@@ -38,6 +38,10 @@ class Plugin:
                                    lambda *args: guarded_assign_logo(Path(__file__).parent, *args))
             status = "partial" if result["skipped"] or result["failed"] or result["configuration_errors"] else "ok"
             message = f"Applied {result['applied']}, skipped {result['skipped']}, failed {result['failed']}."
+            generic_count = sum(item.get("method") == "network_fallback" and item["status"] == "applied"
+                                for item in result["channels"])
+            if generic_count:
+                message += f" Generic network logos applied: {generic_count}."
             details = result["configuration_errors"] + [
                 f"channel {item['channel']} ({item['name']}): {item['reason']}"
                 for item in result["channels"] if item["status"] != "applied"

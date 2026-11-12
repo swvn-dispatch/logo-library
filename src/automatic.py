@@ -24,6 +24,17 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
                     and row.get("group") not in (None, "")}
     counts = Counter(str(row["group"]) for row in rows if isinstance(row, dict)
                      and row.get("group") not in (None, ""))
+    selected = settings.get("automatic_default_groups", [])
+    if not isinstance(selected, list) or any(not isinstance(group, (str, int)) or isinstance(group, bool) for group in selected):
+        return {}, ["Shared groups must be a list of group IDs"]
+    # An explicit row, including a disabled or invalid one, always overrides a
+    # shared selection. It must never silently fall back to a broader policy.
+    selected = dict.fromkeys(str(group) for group in selected if group not in (None, ""))
+    rows = list(rows) + [{"group": group, "strategy": settings.get("automatic_default_strategy", "exact"),
+                          "scope": settings.get("automatic_default_scope", ""),
+                          "replace": settings.get("automatic_default_replace", False)}
+                         for group in selected if group not in counts]
+    counts.update(group for group in selected if group not in counts)
     groups = {str(group) for group in group_ids}
     compiled, errors = {}, []
     for index, row in enumerate(rows, 1):
@@ -58,7 +69,7 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
             prefix = rule.get("prefix", "") if rule else settings.get("automatic_prefix", "")
             if not isinstance(prefix, str):
                 raise ValueError("Name prefix must be text")
-            prefix_mode = (rule.get("mode") or "literal") if rule else "literal"
+            prefix_mode = (rule.get("mode") or "literal") if rule else (settings.get("automatic_prefix_mode") or "literal")
             if prefix_mode not in {"literal", "regex"}:
                 raise ValueError("Unknown prefix mode")
             if prefix_mode == "regex":
@@ -69,13 +80,20 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
             variant = settings.get("automatic_variant", "strict") or "strict"
             if variant not in {"strict", "standard"}:
                 raise ValueError("Unknown variant preference")
+            generic = settings.get("automatic_generic_fallback", False)
+            if not isinstance(generic, bool):
+                raise ValueError("Generic network fallback must be a boolean")
+            guide = settings.get("automatic_guide_signals", False)
+            if not isinstance(guide, bool):
+                raise ValueError("Guide ID signal must be a boolean")
             threshold = settings.get("automatic_threshold", 90)
             if strategy == "fuzzy" and (isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not 0 <= threshold <= 100):
                 raise ValueError("Fuzzy threshold must be between 0 and 100")
             compiled[group] = {"strategy": strategy, "catalog": catalog_id,
                                "scope": "" if str(path) == "." else str(path), "replace": bool(replace),
                                "prefix": prefix, "prefix_mode": prefix_mode,
-                               "variant": variant, "threshold": threshold}
+                               "variant": variant, "generic_fallback": generic, "guide_signals": guide,
+                               "threshold": threshold}
         except ValueError as exc:
             errors.append(f"Row {index}: {exc}")
     return compiled, errors
