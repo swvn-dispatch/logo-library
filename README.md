@@ -23,8 +23,6 @@ This project is maintained in my spare time. If it's saved you some headaches, a
 5. For specific logos, add rows under **Manual assignment**, save, and run
    **Manual Match**.
 
-See the [user guide](USER_GUIDE.md) for detailed setup and recommendations.
-
 ## Automatic assignment
 
 Auto Match runs only when requested, for groups with a valid enabled row. Start
@@ -62,8 +60,7 @@ score above it. Similarity is not a probability that a logo is correct.
 
 **Use guide IDs as a station hint** and **Allow generic network logos** are off
 by default. Guide IDs may be stale and cannot verify a station's city. A generic
-network logo is a substitute, not a confirmed station-specific logo. See the
-[user guide](USER_GUIDE.md) before enabling these options.
+network logo is a substitute, not a confirmed station-specific logo.
 
 ## Manual assignment
 

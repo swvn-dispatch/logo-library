@@ -21,6 +21,7 @@ class DispatcharrTests(unittest.TestCase):
         models = types.ModuleType("apps.plugins.models")
         models.PluginConfig = model
         history = types.ModuleType("apps.plugins.task_history")
+        history._client = MagicMock()
         history.get_task_history = MagicMock(return_value=[{"action_id": "run_automatic", "status": "partial", "result": {
             "channels": [{"channel": "2", "status": "skipped"}, {"channel": "2", "status": "failed"},
                          {"channel": "3", "status": "applied"}]}}])
@@ -33,7 +34,16 @@ class DispatcharrTests(unittest.TestCase):
             self.assertIn("Reload the plugin", result["message"])
             plugin.save.assert_called_once_with(update_fields=["settings"])
             self.assertIn("Added 0", ignore_latest_skipped("/plugin")["message"])
+            history.get_task_history.return_value[0]["result"] = {"channels": [{"channel": "12.5", "status": "skipped"}],
+                                                                  "channel_numbers": True,
+                                                                  "ignored_channel_reference": "a" * 32}
+            history._client.return_value.get.return_value = '["4"]'
+            self.assertIn("Added 1", ignore_latest_skipped("/plugin")["message"])
+            self.assertEqual(plugin.settings["automatic_ignored_channels"], ["1", "2", "4"])
+            history._client.return_value.get.return_value = None
+            self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
             plugin.settings["automatic_ignored_channels"] = "invalid"
+            history._client.return_value.get.return_value = '["4"]'
             self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
             history.get_task_history.return_value[0]["status"] = "running"
             self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
@@ -41,14 +51,14 @@ class DispatcharrTests(unittest.TestCase):
             self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
 
     def test_automatic_channel_snapshot_uses_effective_values(self):
-        row = types.SimpleNamespace(id=1, effective_name="Override", effective_channel_group_id=2, effective_logo_id=3, effective_tvg_id="ABC.us")
+        row = types.SimpleNamespace(id=1, effective_channel_number=12.5, effective_name="Override", effective_channel_group_id=2, effective_logo_id=3, effective_tvg_id="ABC.us")
         models = types.ModuleType("apps.channels.models")
         models.Channel = MagicMock()
         managers = types.ModuleType("apps.channels.managers")
         managers.with_effective_values = MagicMock(return_value=[row])
         with patch.dict(sys.modules, {"apps": types.ModuleType("apps"), "apps.channels": types.ModuleType("apps.channels"),
                                       "apps.channels.models": models, "apps.channels.managers": managers}):
-            self.assertEqual(automatic_channels(), [{"id": 1, "name": "Override", "group_id": 2, "logo_id": 3, "guide_id": "ABC.us"}])
+            self.assertEqual(automatic_channels(), [{"id": 1, "number": "12.5", "name": "Override", "group_id": 2, "logo_id": 3, "guide_id": "ABC.us"}])
 
     def test_guard_rechecks_current_settings_and_effective_values(self):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}

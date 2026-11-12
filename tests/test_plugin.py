@@ -91,7 +91,7 @@ class PluginTests(unittest.TestCase):
         by_id = {field["id"]: field for field in fields}
         select = by_id["automatic_ignored_channels"]
         self.assertEqual(select["default"], ["1", "9"])
-        self.assertIn({"value": "9", "label": "Missing channel (ID 9)"}, select["options"])
+        self.assertIn({"value": "9", "label": "Missing channel"}, select["options"])
         self.assertIn("First", by_id["manual_legacy_ignore"]["description"])
         settings["automatic_ignored_channels"] = []
         with tempfile.TemporaryDirectory() as root:
@@ -245,12 +245,13 @@ class PluginTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
 
     def test_action_reports_partial_result(self):
-        with patch("src.group_options", return_value=[]), patch("src.apply_mappings", return_value={"applied": 1, "skipped": 1, "errors": [
+        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[{"id": 44, "number": "10.5", "name": "Test"}]), patch("src.apply_mappings", return_value={"applied": 1, "skipped": 1, "errors": [
             {"row": 2, "channel": "44", "message": "missing"}
         ]}):
             result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": {"mappings": []}})
         self.assertEqual(result["status"], "partial")
-        self.assertIn("channel 44", result["message"])
+        self.assertEqual(result["message"], "Applied 1, ignored 0, skipped 1.")
+        self.assertEqual(result["errors"][0]["channel"], "10.5")
 
     def test_manual_match_keeps_saved_mappings_despite_filters(self):
         settings = {"mappings": [{"channel": "1", "logo": "tv_logos:countries/us/a.png"}],
@@ -284,11 +285,14 @@ class PluginTests(unittest.TestCase):
     def test_automatic_action_reports_details(self):
         report = {"applied": 0, "skipped": 1, "failed": 0, "configuration_errors": [],
                   "channels": [{"channel": "1", "name": "Test", "status": "skipped", "reason": "manual_mapping"}]}
-        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[]), \
+        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[{"id": 1, "number": "42", "name": "Test"}]), \
+             patch("src.store_skipped_ids", return_value="a" * 32), \
              patch("src.run_automatic", return_value=report):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
         self.assertEqual(result["status"], "partial")
-        self.assertIn("channel 1 (Test): manual_mapping", result["message"])
+        self.assertEqual(result["message"], "Applied 0, manual mappings preserved 0, ignored 0, skipped 1, failed 0.")
+        self.assertEqual(result["channels"][0]["channel"], "42")
+        self.assertEqual(result["channels"][0]["reason"], "manual_mapping")
 
     def test_automatic_action_reports_generic_fallback_count(self):
         report = {"applied": 1, "skipped": 0, "failed": 0, "configuration_errors": [],
@@ -297,6 +301,24 @@ class PluginTests(unittest.TestCase):
              patch("src.run_automatic", return_value=report):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
         self.assertIn("Generic network logos applied: 1", result["message"])
+
+    def test_automatic_results_use_numbers_but_store_distinct_channel_ids(self):
+        channels = [{"id": 101, "number": "7", "name": "A"},
+                    {"id": 202, "number": "7", "name": "B"},
+                    {"id": 303, "number": None, "name": "C"}]
+        report = {"applied": 0, "skipped": 2, "failed": 1, "configuration_errors": ["Bad group"],
+                  "channels": [{"channel": str(c["id"]), "name": c["name"],
+                                "status": "failed" if c["id"] == 303 else "skipped", "reason": "no_match"}
+                               for c in channels]}
+        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=channels), \
+             patch("src.store_skipped_ids", return_value="a" * 32) as store, patch("src.run_automatic", return_value=report):
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {"automatic_ignored_channels": ["101"]}})
+        self.assertEqual([row["channel"] for row in result["channels"]], ["7", "7", None])
+        self.assertEqual(store.call_args.args[1], ["101", "202", "303"])
+        self.assertEqual(result["configuration"]["ignored_channels"], [{"number": "7", "name": "A"}])
+        self.assertEqual(result["configuration_errors"], ["Bad group"])
+        self.assertNotIn("101", json.dumps(result))
+        self.assertNotIn("Bad group", result["message"])
 
     def test_automatic_action_reports_preserved_and_ignored_as_success(self):
         report = {"applied": 0, "preserved": 1, "ignored": 1, "skipped": 0, "failed": 0,
@@ -355,7 +377,7 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": settings})
         self.assertEqual(result["plugin_version"], Plugin.version)
         self.assertEqual(result["configuration"]["snapshot"], "start_of_run")
-        self.assertEqual(result["configuration"]["ignored_channels"], ["2", "7"])
+        self.assertEqual(result["configuration"]["ignored_channels"], [{"number": None, "name": None}, {"number": None, "name": None}])
         groups = result["configuration"]["groups"]
         self.assertEqual(groups[0], {"row": 1, "group": "1", "group_name": "Canadian locals",
                                      "strategy": "exact", "scope": "countries/canada", "replace": True})

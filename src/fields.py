@@ -54,7 +54,7 @@ def make_fields(data_dir, settings, channels, groups=()):
         channel, logo = row.get("channel"), row.get("logo")
         if channel not in (None, "") and str(channel) not in channel_ids:
             channel_ids.add(str(channel))
-            channel_options.append({"value": str(channel), "label": f"Missing channel (ID {channel})"})
+            channel_options.append({"value": str(channel), "label": "Missing channel"})
         if _valid_text(logo) and logo and logo not in logo_ids:
             logo_ids.add(logo)
             try:
@@ -71,7 +71,7 @@ def make_fields(data_dir, settings, channels, groups=()):
     ignore_ids = {str(option["value"]) for option in ignore_options}
     for channel_id in ignored_ids:
         if channel_id not in ignore_ids:
-            ignore_options.append({"value": channel_id, "label": f"Missing channel (ID {channel_id})"})
+            ignore_options.append({"value": channel_id, "label": "Missing channel"})
     channel_labels = {str(option["value"]): option["label"] for option in channel_options}
     legacy_ignored = sorted({str(row["channel"]) for row in rows if isinstance(row, dict)
                              and row.get("ignore") is True and row.get("channel") not in (None, "")})
@@ -105,7 +105,7 @@ def make_fields(data_dir, settings, channels, groups=()):
         *([{"id": "manual_legacy_ignore", "type": "info", "section": "manual_assignment",
             "label": "Previously ignored channels",
             "description": "Save these channels in Channels to ignore under Automatic assignment, then remove their old manual rows: "
-            + ", ".join(channel_labels.get(channel, f"ID {channel}") for channel in legacy_ignored)
+            + ", ".join(channel_labels.get(channel, "Missing channel") for channel in legacy_ignored)
             + ". Those old rows never assign a logo."}] if legacy_ignored else []),
         {"id": "mappings", "type": "table", "section": "manual_assignment", "label": "Channel logo mappings", "default": [],
          "columns": [

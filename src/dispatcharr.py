@@ -1,12 +1,16 @@
 """Dispatcharr channel and logo integration."""
 
 import hashlib
+import json
+import logging
 import os
 from pathlib import Path
 import shutil
 import tempfile
+import uuid
 
 LOGO_DIR = Path("/data/logos")
+logger = logging.getLogger(__name__)
 
 
 def assign_logo(channel_id, relative, image, logo_dir=LOGO_DIR):
@@ -32,7 +36,7 @@ def assign_logo(channel_id, relative, image, logo_dir=LOGO_DIR):
     with transaction.atomic():
         channel = Channel.objects.select_for_update().filter(pk=channel_pk).first()
         if channel is None:
-            raise ValueError(f"Channel {channel_id} no longer exists")
+            raise ValueError("Channel no longer exists")
         fd, temp_name = tempfile.mkstemp(prefix=".logo-library-", suffix=".tmp", dir=logo_dir)
         try:
             with os.fdopen(fd, "wb") as output, image.open("rb") as source:
@@ -93,10 +97,31 @@ def automatic_channels():
     from apps.channels.managers import with_effective_values
     from apps.channels.models import Channel
 
-    return [{"id": channel.id, "name": channel.effective_name,
+    return [{"id": channel.id, "number": format_channel_number(channel.effective_channel_number), "name": channel.effective_name,
              "group_id": channel.effective_channel_group_id, "logo_id": channel.effective_logo_id,
              "guide_id": channel.effective_tvg_id}
-            for channel in with_effective_values(Channel.objects.all())]
+             for channel in with_effective_values(Channel.objects.all())]
+
+
+def format_channel_number(number):
+    return f"{number:.1f}".removesuffix(".0") if number is not None else None
+
+
+def store_skipped_ids(code_dir, ids):
+    """Store internal IDs separately from the downloadable result, alongside task history."""
+    try:
+        from apps.plugins.loader import normalize_plugin_key
+        from apps.plugins.task_history import _client, HISTORY_TTL_SECONDS
+        client = _client()
+        if client is None:
+            return None
+        token = uuid.uuid4().hex
+        key = f"logo_library_skipped:{normalize_plugin_key(Path(code_dir).name)}:{token}"
+        client.setex(key, HISTORY_TTL_SECONDS, json.dumps(ids))
+        return token
+    except Exception:
+        logger.warning("Could not store skipped channel identities", exc_info=True)
+        return None
 
 
 def ignore_latest_skipped(code_dir):
@@ -104,7 +129,7 @@ def ignore_latest_skipped(code_dir):
     from django.db import transaction
     from apps.plugins.loader import normalize_plugin_key
     from apps.plugins.models import PluginConfig
-    from apps.plugins.task_history import get_task_history
+    from apps.plugins.task_history import get_task_history, _client
     from .mappings import automatic_ignored_channels
 
     key = normalize_plugin_key(Path(code_dir).name)
@@ -116,11 +141,28 @@ def ignore_latest_skipped(code_dir):
     if not isinstance(result, dict) or not isinstance(result.get("channels"), list):
         return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
     try:
-        values = [item["channel"] for item in result["channels"]
-                  if isinstance(item, dict) and item.get("status") in {"skipped", "failed"}]
+        token = result.get("ignored_channel_reference")
+        if token:
+            if not isinstance(token, str) or len(token) != 32 or any(c not in "0123456789abcdef" for c in token):
+                raise ValueError("Invalid reference")
+            client = _client()
+            raw = client.get(f"logo_library_skipped:{key}:{token}") if client else None
+            if raw is None:
+                return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
+            values = json.loads(raw)
+        elif result.get("channel_numbers") is True:
+            if any(isinstance(item, dict) and item.get("status") in {"skipped", "failed"} for item in result["channels"]):
+                return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
+            values = []
+        else:
+            values = [item["channel"] for item in result["channels"]
+                      if isinstance(item, dict) and item.get("status") in {"skipped", "failed"}]
         selected = automatic_ignored_channels({"automatic_ignored_channels": values})
-    except (KeyError, ValueError):
+    except (KeyError, ValueError, TypeError):
         return {"status": "error", "message": "The latest Auto Match contains invalid channel results."}
+    except Exception:
+        logger.warning("Could not retrieve skipped channel identities", exc_info=True)
+        return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
     with transaction.atomic():
         plugin = PluginConfig.objects.select_for_update().filter(key=key).first()
         if plugin is None or not isinstance(plugin.settings, dict):

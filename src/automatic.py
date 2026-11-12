@@ -8,7 +8,7 @@ import re
 from .mappings import automatic_ignored_channels
 
 
-def configuration_snapshot(settings, group_options):
+def configuration_snapshot(settings, group_options, channels=()):
     """Return matching configuration, with defaults and safe group labels."""
     def scalar(value):
         return value if value is None or isinstance(value, (str, int, float, bool)) else "<invalid>"
@@ -41,7 +41,10 @@ def configuration_snapshot(settings, group_options):
     else:
         filters = "<invalid>"
     try:
-        ignored = sorted(automatic_ignored_channels(settings), key=int)
+        channel_by_id = {str(channel["id"]): channel for channel in channels}
+        ignored = [{"number": channel_by_id.get(channel_id, {}).get("number"),
+                    "name": channel_by_id.get(channel_id, {}).get("name")}
+                   for channel_id in sorted(automatic_ignored_channels(settings), key=int)]
     except ValueError:
         ignored = "<invalid>"
     return {

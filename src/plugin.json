@@ -1,7 +1,7 @@
 {
   "name": "Logo Library",
   "version": "0.1.0",
-  "description": "Assign channel logos from a catalog using manual mappings or group-based automatic matching.",
+  "description": "Assign channel logos from a catalog (like the tv-logo/tv-logos repo) using manual mappings or group-based automatic matching.",
   "author": "sethwv",
   "license": "MIT",
   "manifest_version": 2,
@@ -37,6 +37,8 @@
       "async": true
     }
   ],
+
+  "discord_thread": "https://discord.com/channels/1340492560220684331/1570480168391282718",
   "repo_url": "https://github.com/swvn-dispatch/logo-library",
   "help_url": "https://github.com/swvn-dispatch/logo-library"
 }

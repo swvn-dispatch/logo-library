@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from .dispatcharr import (assign_logo, automatic_channels, channel_options, get_plugin_state,
-                          group_options, guarded_assign_logo, ignore_latest_skipped)
+                          group_options, guarded_assign_logo, ignore_latest_skipped, store_skipped_ids)
 from .automatic_run import run_automatic
 from .automatic import configuration_snapshot
 from .fields import make_fields
@@ -40,8 +40,9 @@ class Plugin:
             options = group_options()
             groups = [option["value"] for option in options]
             settings = context.get("settings", {})
-            configuration = configuration_snapshot(settings, options)
-            result = run_automatic(context["data_dir"], settings, automatic_channels(),
+            channels = automatic_channels()
+            configuration = configuration_snapshot(settings, options, channels)
+            result = run_automatic(context["data_dir"], settings, channels,
                                    groups, catalogs.CATALOGS,
                                    lambda *args: guarded_assign_logo(Path(__file__).parent, *args))
             status = "partial" if result["skipped"] or result["failed"] or result["configuration_errors"] else "ok"
@@ -51,12 +52,14 @@ class Plugin:
                                 for item in result["channels"])
             if generic_count:
                 message += f" Generic network logos applied: {generic_count}."
-            details = result["configuration_errors"] + [
-                f"channel {item['channel']} ({item['name']}): {item['reason']}"
-                for item in result["channels"] if item["status"] in {"skipped", "failed"}
-            ]
-            if details:
-                message += " " + "; ".join(details)
+            skipped_ids = [item["channel"] for item in result["channels"] if item["status"] in {"skipped", "failed"}]
+            reference = store_skipped_ids(Path(__file__).parent, skipped_ids) if skipped_ids else None
+            numbers = {str(channel["id"]): channel.get("number") for channel in channels}
+            for item in result["channels"]:
+                item["channel"] = numbers.get(str(item["channel"]))
+            result["channel_numbers"] = True
+            if reference:
+                result["ignored_channel_reference"] = reference
             return {"status": status, "message": message, "plugin_version": self.version,
                     "configuration": configuration, **result}
         if action == "apply_changes":
@@ -66,13 +69,20 @@ class Plugin:
             except Exception:
                 logger.warning("Could not retrieve group labels for Manual Match results", exc_info=True)
                 options = []
-            configuration = configuration_snapshot(settings, options)
+            try:
+                channels = automatic_channels()
+            except Exception:
+                logger.warning("Could not retrieve channel numbers for Manual Match results", exc_info=True)
+                channels = []
+            configuration = configuration_snapshot(settings, options, channels)
             result = apply_mappings(context["data_dir"], settings.get("mappings", []), assign_logo)
             status = "partial" if result["skipped"] else "ok"
-            errors = "; ".join(f"row {e['row']} (channel {e['channel']}): {e['message']}" for e in result["errors"])
+            channel_by_id = {str(channel["id"]): channel for channel in channels}
+            for error in result["errors"]:
+                channel = channel_by_id.get(str(error["channel"]), {})
+                error["channel"] = channel.get("number")
+                error["name"] = channel.get("name")
             message = f"Applied {result['applied']}, ignored {result.get('ignored', 0)}, skipped {result['skipped']}."
-            if errors:
-                message += " " + errors
             return {"status": status, "message": message, "plugin_version": self.version,
                     "configuration": configuration, **result}
         result = catalogs.run_action(action, params, context)
