@@ -5,6 +5,54 @@ from pathlib import PurePosixPath
 import re
 
 
+def configuration_snapshot(settings, group_options):
+    """Return matching configuration, with defaults and safe group labels."""
+    def scalar(value):
+        return value if value is None or isinstance(value, (str, int, float, bool)) else "<invalid>"
+
+    labels = {str(option["value"]): option["label"] for option in group_options}
+    rows = settings.get("automatic_groups", [])
+    groups = []
+    if isinstance(rows, list):
+        for index, row in enumerate(rows, 1):
+            if not isinstance(row, dict):
+                groups.append({"row": index, "invalid": True})
+                continue
+            group_id = scalar(row.get("group"))
+            groups.append({"row": index, "group": group_id, "group_name": labels.get(str(group_id)),
+                           "strategy": scalar(row.get("strategy")), "scope": scalar(row.get("scope")),
+                           "replace": scalar(row.get("replace"))})
+    else:
+        groups = "<invalid>"
+
+    rules = settings.get("automatic_prefix_rules", [])
+    if isinstance(rules, list):
+        rules = [{key: scalar(row.get(key)) for key in ("group", "mode", "prefix")}
+                 if isinstance(row, dict) else {"invalid": True} for row in rules]
+    else:
+        rules = "<invalid>"
+    filters = settings.get("catalog_filters", [])
+    if isinstance(filters, list):
+        filters = [{key: scalar(row.get(key)) for key in ("mode", "text", "catalog")}
+                   if isinstance(row, dict) else {"invalid": True} for row in filters]
+    else:
+        filters = "<invalid>"
+    return {
+        "snapshot": "start_of_run",
+        "groups": groups,
+        "advanced": {
+            "prefix": scalar(settings.get("automatic_prefix", "")),
+            "prefix_mode": scalar(settings.get("automatic_prefix_mode", "literal")),
+            "prefix_rules": rules,
+            "fuzzy_threshold": scalar(settings.get("automatic_threshold", 90)),
+            "variant_preference": scalar(settings.get("automatic_variant", "strict")),
+            "generic_network_fallback": scalar(settings.get("automatic_generic_fallback", False)),
+            "guide_id_signals": scalar(settings.get("automatic_guide_signals", False)),
+        },
+        "catalog_filters": filters,
+    }
+
+
 def compile_groups(rows, group_ids, catalog_ids, settings=None):
     """Return valid enabled settings keyed by stable group ID and row errors.
 

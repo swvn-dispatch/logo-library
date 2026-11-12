@@ -102,3 +102,11 @@ The selected scope and available catalog files determine what can be matched.
 Even a unique match can be wrong, especially with fuzzy matching, generic
 network logos, or guide-ID hints. Review results before enabling replacement for
 more groups, and use manual mappings where a specific logo matters.
+
+The Manual Match and Auto Match result JSON includes the plugin version and a
+start-of-run snapshot of group settings, advanced settings, and catalog filters.
+This includes configured names, prefixes, regex rules, and filter text, so
+review the result before sharing it. Manual mappings and unrelated plugin
+settings are not included in that snapshot.
+Settings or channel values can change during a run; eligibility is rechecked
+before each assignment.
