@@ -2,6 +2,7 @@
 
 import json
 import logging
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from .dispatcharr import (assign_logo, automatic_channels, channel_options,
@@ -15,6 +16,16 @@ from .scheduling import action_lock, run_service
 
 _MANIFEST = json.loads((Path(__file__).parent / "plugin.json").read_text(encoding="utf-8"))
 logger = logging.getLogger(__name__)
+
+
+def _channel_sort_key(item):
+    try:
+        number = Decimal(str(item.get("channel")))
+        if not number.is_finite():
+            raise InvalidOperation
+        return (0, number, str(item.get("name", "")).casefold())
+    except (InvalidOperation, ValueError):
+        return (1, Decimal(0), str(item.get("name", "")).casefold())
 
 
 class Plugin:
@@ -72,6 +83,12 @@ class Plugin:
             numbers = {str(channel["id"]): channel.get("number") for channel in channels}
             for item in result["channels"]:
                 item["channel"] = numbers.get(str(item["channel"]))
+            grouped = {"success": [], "skipped": [], "failed": []}
+            for item in result["channels"]:
+                grouped[item["status"] if item["status"] in {"skipped", "failed"} else "success"].append(item)
+            for entries in grouped.values():
+                entries.sort(key=_channel_sort_key)
+            result["channels"] = grouped
             result["channel_numbers"] = True
             if reference:
                 result["ignored_channel_reference"] = reference

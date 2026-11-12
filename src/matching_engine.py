@@ -10,6 +10,7 @@ from .callsign_matching import match_callsign
 from .fuzzy_matching import match_fuzzy
 from .name_matching import _filename_name, match_name, normalize_name
 from .variants import select_variant
+from .candidates import candidate_details
 
 _STATION_TOKEN = r"(?:[KW][A-Z]{2,3}|C[A-Z]{3})"
 
@@ -50,7 +51,8 @@ def _network_fallback(segments, index, variant, catalog_id):
     length = max(size for size, _ in candidates)
     paths = {path for size, path in candidates if size == length}
     chosen = select_variant(paths, variant, catalog_id)
-    return {"path": chosen, "reason": None if chosen else "ambiguous", "method": "network_fallback"}
+    return {"path": chosen, "reason": None if chosen else "ambiguous", "method": "network_fallback",
+            **(candidate_details(paths) if chosen is None else {})}
 
 
 def _explicit_station(name, segments):
@@ -74,13 +76,13 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
     evidence = []
     full = match_name(name, name_index, prefix, mode, variant, catalog_id)
     if full["reason"] == "ambiguous":
-        return {"path": None, "reason": "ambiguous", "method": "exact"}
+        return {**full, "method": "exact"}
     if full["path"]:
         evidence.append((full["path"], "exact", normalize_name(name, prefix, mode)))
 
     station = match_callsign(name, callsign_index, variant, catalog_id)
     if station["reason"] in {"ambiguous", "ambiguous_callsign"}:
-        return {"path": None, "reason": station["reason"], "method": "callsign"}
+        return {**station, "method": "callsign"}
     if station["path"]:
         evidence.append((station["path"], "callsign", ""))
 
@@ -109,13 +111,13 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
                 continue
             match = match_name(segment, name_index, variant=variant, catalog_id=catalog_id)
             if match["reason"] == "ambiguous":
-                return {"path": None, "reason": "ambiguous", "method": "name_segment"}
+                return {**match, "method": "name_segment"}
             if match["path"]:
                 evidence.append((match["path"], "name_segment", key))
             station_paths = (station_name_index or {}).get(key, ())
             station_path = select_variant(station_paths, variant, catalog_id)
             if station_paths and station_path is None:
-                return {"path": None, "reason": "ambiguous", "method": "station_name"}
+                return {"path": None, "reason": "ambiguous", "method": "station_name", **candidate_details(station_paths)}
             if station_path:
                 evidence.append((station_path, "station_name", key))
     elif station_name_index:
@@ -123,7 +125,7 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
         station_paths = station_name_index.get(key, ())
         station_path = select_variant(station_paths, variant, catalog_id)
         if station_paths and station_path is None:
-            return {"path": None, "reason": "ambiguous", "method": "station_name"}
+            return {"path": None, "reason": "ambiguous", "method": "station_name", **candidate_details(station_paths)}
         if station_path:
             evidence.append((station_path, "station_name", key))
 
@@ -135,7 +137,7 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
             continue
         match = match_name(alias, name_index, variant=variant, catalog_id=catalog_id)
         if match["reason"] == "ambiguous":
-            return {"path": None, "reason": "ambiguous", "method": "name_alias"}
+            return {**match, "method": "name_alias"}
         if match["path"]:
             evidence.append((match["path"], "name_alias", normalize_name(alias)))
 
@@ -150,7 +152,7 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
                for path, _, key in evidence):
             paths = {station_path}
     if len(paths) > 1:
-        return {"path": None, "reason": "conflicting_matches", "method": "combined"}
+        return {"path": None, "reason": "conflicting_matches", "method": "combined", **candidate_details(paths)}
     if paths:
         path = next(iter(paths))
         if any(p == path and method == "guide_callsign" for p, method, _ in evidence):

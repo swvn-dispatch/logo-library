@@ -40,6 +40,9 @@ class DispatcharrTests(unittest.TestCase):
             history._client.return_value.get.return_value = '["4"]'
             self.assertIn("Added 1", ignore_latest_skipped("/plugin")["message"])
             self.assertEqual(plugin.settings["automatic_ignored_channels"], ["1", "2", "4"])
+            history.get_task_history.return_value[0]["result"]["channels"] = {
+                "success": [], "skipped": [{"channel": "12.5", "status": "skipped"}], "failed": []}
+            self.assertIn("Added 0", ignore_latest_skipped("/plugin")["message"])
             history._client.return_value.get.return_value = None
             self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
             plugin.settings["automatic_ignored_channels"] = "invalid"

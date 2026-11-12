@@ -6,6 +6,7 @@ import re
 
 from .catalog_scope import scoped_paths
 from .variants import select_variant
+from .candidates import candidate_details
 
 # TV Logos uses these country suffixes in the corresponding directories.
 # Do not strip an unrecognized suffix: it may be part of a network name.
@@ -103,5 +104,5 @@ def match_name(channel_name, index, prefix="", prefix_mode="literal", variant="s
         return {"path": None, "reason": "no_match"}
     selected = select_variant(candidates, variant, catalog_id)
     if selected is None:
-        return {"path": None, "reason": "ambiguous"}
+        return {"path": None, "reason": "ambiguous", **candidate_details(candidates)}
     return {"path": selected, "reason": None}

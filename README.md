@@ -49,6 +49,16 @@ The action needs an available task result.
 Complete manual mappings and ignored channels are reported as preserved or
 ignored rather than skipped. A preserved mapping has not necessarily been
 applied or verified. Review skipped channels and failures in the action result.
+The downloadable Auto Match result groups `channels` into `success`, `skipped`
+and `failed` arrays, sorted by channel number. Successful entries distinguish
+applied logos, preserved manual mappings and ignored channels. Ambiguous and
+below-threshold results can include up to ten candidate catalog paths considered
+within the configured scope and filters. `candidates_truncated` is the number
+omitted. Fuzzy candidates include a `similarity` percentage; it measures name
+similarity, not the probability that a logo is correct. Only the best-scoring
+fuzzy candidates are shown, including ties. Candidate details do not change
+the matching decision. The grouped object replaces the previous `channels` list
+in newly generated reports; existing reports remain readable by the Ignore action.
 
 ### Advanced settings
 

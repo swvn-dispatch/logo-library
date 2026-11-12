@@ -4,9 +4,16 @@ from src.callsign_matching import build_callsign_index, match_callsign
 from src.fuzzy_matching import match_fuzzy
 from src.name_matching import build_name_index, match_name
 from src.variants import select_variant
+from src.candidates import candidate_details
 
 
 class VariantTests(unittest.TestCase):
+    def test_candidate_details_are_sorted_and_bounded(self):
+        details = candidate_details([f"logo-{i:02}.png" for i in range(13)], 91.234)
+        self.assertEqual(len(details["candidates"]), 10)
+        self.assertEqual(details["candidates_truncated"], 3)
+        self.assertEqual(details["candidates"][0], {"path": "logo-00.png", "similarity": 91.23})
+
     def test_hd_preference_and_conservative_fallback(self):
         base = "countries/united-kingdom/bbc-one-uk.png"
         hd = "countries/united-kingdom/hd/bbc-one-hd-uk.png"
