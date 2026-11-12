@@ -80,6 +80,7 @@ class PluginTests(unittest.TestCase):
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
             "automatic_assignment", "automatic_setup_help", "automatic_group_help",
+            "automatic_strategy_help", "automatic_scope_help", "automatic_replace_help",
             "automatic_groups", "automatic_ignored_channels", "automatic_advanced", "automatic_prefix",
             "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
@@ -97,8 +98,12 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_setup_help"]["section"], "automatic_assignment")
         self.assertIn("review the results for channels that were skipped or failed", by_id["automatic_setup_help"]["description"])
-        self.assertIn("Catalog filters still apply", by_id["automatic_group_help"]["description"])
-        self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_group_help"]["description"])
+        self.assertEqual(by_id["automatic_group_help"]["label"], "Group settings")
+        for field_id in ("automatic_strategy_help", "automatic_scope_help", "automatic_replace_help"):
+            self.assertNotIn("label", by_id[field_id])
+            self.assertEqual(by_id[field_id]["section"], "automatic_assignment")
+        self.assertIn("Catalog filters still apply", by_id["automatic_scope_help"]["description"])
+        self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_replace_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
         self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic assignment - Advanced")
