@@ -123,7 +123,14 @@ def ignore_latest_skipped(code_dir):
     if not latest or latest.get("status") == "running":
         return {"status": "error", "message": "No completed Auto Match result is available. Run Auto Match first."}
     result = latest.get("result")
-    if not isinstance(result, dict) or not isinstance(result.get("channels"), list):
+    if not isinstance(result, dict):
+        return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
+    channels = result.get("channels")
+    if isinstance(channels, dict):
+        if any(not isinstance(channels.get(key), list) for key in ("success", "skipped", "failed")):
+            return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
+        channels = channels["success"] + channels["skipped"] + channels["failed"]
+    if not isinstance(channels, list):
         return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
     try:
         token = result.get("ignored_channel_reference")
@@ -136,11 +143,11 @@ def ignore_latest_skipped(code_dir):
                 return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
             values = json.loads(raw)
         elif result.get("channel_numbers") is True:
-            if any(isinstance(item, dict) and item.get("status") in {"skipped", "failed"} for item in result["channels"]):
+            if any(isinstance(item, dict) and item.get("status") in {"skipped", "failed"} for item in channels):
                 return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
             values = []
         else:
-            values = [item["channel"] for item in result["channels"]
+            values = [item["channel"] for item in channels
                       if isinstance(item, dict) and item.get("status") in {"skipped", "failed"}]
         selected = automatic_ignored_channels({"automatic_ignored_channels": values})
     except (KeyError, ValueError, TypeError):

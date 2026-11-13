@@ -25,7 +25,7 @@ This project is maintained in my spare time. If it's saved you some headaches, a
 
 ## Automatic assignment
 
-Auto Match runs only when requested, for groups with a valid enabled row. Start
+Auto Match runs when requested or scheduled, for groups with a valid enabled row. Start
 with **Standard**, which uses channel names and station information. **Standard
 + fuzzy** also considers similar names when stronger matches are unavailable.
 Review assignments, especially when using fuzzy matching.
@@ -49,6 +49,16 @@ The action needs an available task result.
 Complete manual mappings and ignored channels are reported as preserved or
 ignored rather than skipped. A preserved mapping has not necessarily been
 applied or verified. Review skipped channels and failures in the action result.
+The downloadable Auto Match result groups `channels` into `success`, `skipped`
+and `failed` arrays, sorted by channel number. Successful entries distinguish
+applied logos, preserved manual mappings and ignored channels. Ambiguous and
+below-threshold results can include up to ten candidate catalog paths considered
+within the configured scope and filters. `candidates_truncated` is the number
+omitted. Fuzzy candidates include a `similarity` percentage; it measures name
+similarity, not the probability that a logo is correct. Only the best-scoring
+fuzzy candidates are shown, including ties. Candidate details do not change
+the matching decision. The grouped object replaces the previous `channels` list
+in newly generated reports; existing reports remain readable by the Ignore action.
 
 ### Advanced settings
 
@@ -58,9 +68,17 @@ Python regex. Avoid regex patterns with excessive backtracking, which can stall
 the matching task. The fuzzy threshold defaults to 90 percent; a match must
 score above it. Similarity is not a probability that a logo is correct.
 
-**Use guide IDs as a station hint** and **Allow generic network logos** are off
-by default. Guide IDs may be stale and cannot verify a station's city. A generic
-network logo is a substitute, not a confirmed station-specific logo.
+Logo variant preference defaults to Prefer standard and can instead prefer an HD
+logo within a recognized variant family. Prefer HD chooses the HD logo with the
+fewest additional recognized variant attributes, or a standard logo when no HD
+variant is available. Remaining ties are skipped.
+
+**Use channel TVG ID as a station hint** is off by default. The station hint reads
+the channel's TVG ID, using its override when set, not the matched EPG entry.
+TVG IDs may be stale and cannot verify a
+station's city. A generic network logo is a substitute, not a confirmed
+station-specific logo. **Allow generic network logos** is on by default; disable
+it to avoid substituting a generic logo for a station.
 
 ## Manual assignment
 
@@ -89,6 +107,31 @@ the plugin and reopen its settings to refresh choices after changing filters or
 updating the catalog. Catalog updates do not automatically assign logos.
 Dispatcharr caches field options per process, so confirm that settings saved
 successfully after a reload.
+
+## Scheduled Tasks
+
+The collapsed **Scheduled Tasks** section below Catalog filters controls Auto
+Match and catalog refresh independently. Both are disabled by default. Select
+**Interval** and enter a whole number of hours from 1 to 87600, or select
+**Cron** and enter five fields: minute, hour, day of month, month and weekday.
+For example, `0 3 * * 0` runs at 03:00 on Sundays. Cron uses **UTC**, not the
+container timezone. Numeric fields, lists, ranges and steps are supported;
+weekday 0 or 7 is Sunday. When both day fields are restricted, either can
+match. Invalid schedules do not run and are reported in settings and logs.
+
+Save settings to apply a schedule. A new or changed interval starts counting
+from when the scheduler sees it; a new cron schedule waits for a later minute.
+Cron runs missed while the service is down are not replayed. An overdue interval
+runs once after the service resumes, then counts from that dispatch. Task
+history shows scheduled outcomes. Auto Match uses current saved settings and
+can replace logos where Replace is enabled. Catalog refresh does not run Auto
+Match or update copied logos, and choices still require a plugin reload.
+
+The scheduler stops when the plugin loses leadership or is disabled. A task
+already running is not stopped. Overlapping runs of the same action, including
+manual runs, are rejected. A claimed slot can be lost if the leader crashes
+between recording the claim and dispatching it; this avoids replaying the same
+slot after a handoff. Dispatch failures are logged and retried while due.
 
 ## Requirements
 

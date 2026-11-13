@@ -93,6 +93,11 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
                 detail["method"] = match["method"]
                 if match.get("score") is not None:
                     detail["score"] = match["score"]
+                if match.get("candidates"):
+                    detail["candidates"] = [{**candidate, "path": f"{catalog.id}:{candidate['path']}"}
+                                            for candidate in match["candidates"]]
+                    if match.get("candidates_truncated"):
+                        detail["candidates_truncated"] = match["candidates_truncated"]
                 reason = match["reason"]
                 if reason is None:
                     identity = f"{catalog.id}:{match['path']}"

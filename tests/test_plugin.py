@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 import tempfile
 import unittest
+from contextlib import nullcontext
 from unittest.mock import patch
 
 from src import Plugin
@@ -14,6 +15,11 @@ from test_catalog import archive, opener
 
 
 class PluginTests(unittest.TestCase):
+    def setUp(self):
+        lock = patch("src.action_lock", return_value=nullcontext(True))
+        lock.start()
+        self.addCleanup(lock.stop)
+
     def test_fields_use_discovery_context_without_creating_data_dir(self):
         with tempfile.TemporaryDirectory() as root:
             data_dir = Path(root) / "not-created"
@@ -74,10 +80,13 @@ class PluginTests(unittest.TestCase):
         self.assertEqual([field["id"] for field in fields], [
             "instructions", "manual_assignment", "manual_instructions", "mappings",
             "automatic_assignment", "automatic_setup_help", "automatic_group_help",
+            "automatic_strategy_help", "automatic_scope_help", "automatic_replace_help",
             "automatic_groups", "automatic_ignored_channels", "automatic_advanced", "automatic_prefix",
             "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
+            "scheduled_tasks", "scheduled_tasks_help", "schedule_automatic_mode", "schedule_automatic_value",
+            "schedule_catalog_mode", "schedule_catalog_value",
         ])
         by_id = {field["id"]: field for field in fields}
         self.assertNotIn("section", by_id["instructions"])
@@ -89,8 +98,12 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["automatic_assignment"]["type"], "section")
         self.assertEqual(by_id["automatic_setup_help"]["section"], "automatic_assignment")
         self.assertIn("review the results for channels that were skipped or failed", by_id["automatic_setup_help"]["description"])
-        self.assertIn("Catalog filters still apply", by_id["automatic_group_help"]["description"])
-        self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_group_help"]["description"])
+        self.assertEqual(by_id["automatic_group_help"]["label"], "Group settings")
+        for field_id in ("automatic_strategy_help", "automatic_scope_help", "automatic_replace_help"):
+            self.assertNotIn("label", by_id[field_id])
+            self.assertEqual(by_id[field_id]["section"], "automatic_assignment")
+        self.assertIn("Catalog filters still apply", by_id["automatic_scope_help"]["description"])
+        self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_replace_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
         self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic assignment - Advanced")
@@ -104,10 +117,16 @@ class PluginTests(unittest.TestCase):
         ])
         self.assertEqual(by_id["automatic_threshold"]["default"], 90)
         self.assertEqual(by_id["automatic_groups"]["columns"][-1]["label"], "Replace")
-        self.assertEqual(by_id["automatic_variant"]["default"], "strict")
-        self.assertFalse(by_id["automatic_generic_fallback"]["default"])
+        self.assertEqual(by_id["automatic_variant"]["default"], "standard")
+        self.assertIn({"value": "hd", "label": "Prefer HD variant"}, by_id["automatic_variant"]["options"])
+        self.assertTrue(by_id["automatic_generic_fallback"]["default"])
         self.assertFalse(by_id["automatic_guide_signals"]["default"])
+        self.assertEqual(by_id["automatic_guide_signals"]["label"], "Use channel TVG ID as a station hint")
+        self.assertIn("not its matched EPG entry", by_id["automatic_guide_signals"]["description"])
         self.assertTrue(by_id["catalog_filters_section"]["collapsed"])
+        self.assertTrue(by_id["scheduled_tasks"]["collapsed"])
+        self.assertEqual(by_id["schedule_automatic_mode"]["default"], "disabled")
+        self.assertEqual(by_id["schedule_catalog_mode"]["default"], "disabled")
         self.assertEqual(by_id["catalog_filters"]["section"], "catalog_filters_section")
         self.assertEqual([column["id"] for column in by_id["catalog_filters"]["columns"]], ["mode", "text"])
         self.assertEqual(len(by_id["catalog_filters"]["columns"][0]["options"]), 8)
@@ -322,16 +341,29 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "code_dir": "/plugin", "settings": {}})
         self.assertEqual(result["status"], "partial")
         self.assertEqual(result["message"], "Applied 0, manual mappings preserved 0, ignored 0, skipped 1, failed 0.")
-        self.assertEqual(result["channels"][0]["channel"], "42")
-        self.assertEqual(result["channels"][0]["reason"], "manual_mapping")
+        self.assertEqual(result["channels"]["skipped"][0]["channel"], "42")
+        self.assertEqual(result["channels"]["skipped"][0]["reason"], "manual_mapping")
 
     def test_automatic_action_reports_generic_fallback_count(self):
         report = {"applied": 1, "skipped": 0, "failed": 0, "configuration_errors": [],
                   "channels": [{"channel": "1", "name": "Test", "status": "applied", "method": "network_fallback"}]}
         with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[]), \
              patch("src.run_automatic", return_value=report):
-            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "code_dir": "/plugin", "settings": {}})
         self.assertIn("Generic network logos applied: 1", result["message"])
+
+    def test_automatic_groups_and_sorts_channel_numbers(self):
+        channels = [{"id": 1, "number": "10", "name": "Ten"}, {"id": 2, "number": "2.5", "name": "Two"},
+                    {"id": 3, "number": None, "name": "Unnumbered"}, {"id": 4, "number": "3", "name": "Failed"}]
+        report = {"applied": 0, "skipped": 3, "failed": 1, "configuration_errors": [], "channels": [
+            {"channel": str(c["id"]), "name": c["name"], "status": "failed" if c["id"] == 4 else "skipped"}
+            for c in channels]}
+        with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=channels), \
+             patch("src.store_skipped_ids", return_value="a" * 32), patch("src.run_automatic", return_value=report):
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "code_dir": "/plugin", "settings": {}})
+        self.assertEqual(list(result["channels"]), ["success", "skipped", "failed"])
+        self.assertEqual([row["channel"] for row in result["channels"]["skipped"]], ["2.5", "10", None])
+        self.assertEqual(result["channels"]["failed"][0]["channel"], "3")
 
     def test_automatic_results_use_numbers_but_store_distinct_channel_ids(self):
         channels = [{"id": 101, "number": "7", "name": "A"},
@@ -344,7 +376,8 @@ class PluginTests(unittest.TestCase):
         with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=channels), \
              patch("src.store_skipped_ids", return_value="a" * 32) as store, patch("src.run_automatic", return_value=report):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "code_dir": "/plugin", "settings": {"automatic_ignored_channels": ["101"]}})
-        self.assertEqual([row["channel"] for row in result["channels"]], ["7", "7", None])
+        self.assertEqual([row["channel"] for row in result["channels"]["skipped"]], ["7", "7"])
+        self.assertEqual(result["channels"]["failed"][0]["channel"], None)
         self.assertEqual(store.call_args.args[1], ["101", "202", "303"])
         self.assertEqual(result["configuration"]["ignored_channels"], [{"number": "7", "name": "A"}])
         self.assertEqual(result["configuration_errors"], ["Bad group"])
@@ -361,7 +394,7 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": {}})
         self.assertEqual(result["status"], "ok")
         self.assertIn("manual mappings preserved 1, ignored 1", result["message"])
-        self.assertEqual(result["channels"][0]["status"], "success")
+        self.assertEqual(result["channels"]["success"][0]["status"], "success")
 
     def test_manual_mapping_alone_does_not_make_real_auto_run_partial(self):
         class Catalog:
@@ -379,7 +412,7 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": settings})
         self.assertEqual(result["status"], "ok")
         self.assertEqual((result["preserved"], result["skipped"]), (1, 0))
-        self.assertEqual(result["channels"][0]["outcome"], "manual_mapping_preserved")
+        self.assertEqual(result["channels"]["success"][0]["outcome"], "manual_mapping_preserved")
 
     def test_manual_action_ignore_is_not_partial(self):
         report = {"applied": 0, "ignored": 1, "skipped": 0, "errors": []}

@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 from . import catalogs
 from .filters import MATCH_TYPES, catalog_filter_rules, matches
 from .mappings import automatic_ignored_channels
+from .scheduling import parse_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,12 @@ def make_fields(data_dir, settings, channels, groups=()):
     scope_options.extend({"value": path, "label": f"Unavailable or filtered: {path}"}
                          for path in sorted(saved_scopes - directories))
     unavailable_groups = set()
+    schedule_errors = []
+    for key, label in (("automatic", "Auto Match"), ("catalog", "Catalog refresh")):
+        try:
+            parse_schedule(settings.get(f"schedule_{key}_mode", "disabled"), settings.get(f"schedule_{key}_value", ""))
+        except ValueError as exc:
+            schedule_errors.append(f"{label}: {exc}.")
     if isinstance(group_rows, list):
         for row in group_rows:
             if not isinstance(row, dict):
@@ -117,8 +124,14 @@ def make_fields(data_dir, settings, channels, groups=()):
          "label": "Getting started",
          "description": "Add a row for each channel group you want to match. Choose a strategy and catalog folder for each group, then save your settings. Run Auto Match to assign logos and review the results for channels that were skipped or failed."},
         {"id": "automatic_group_help", "type": "info", "section": "automatic_assignment",
-         "label": "Group settings",
-         "description": "Group: The channel group to match.\nStrategy: Start with Standard, which uses names and station information. Standard + fuzzy also considers similar names.\nPath scope: Choose a catalog folder or Entire catalog. We recommend a country folder unless the group contains channels from multiple countries. Catalog filters still apply.\nReplace: Allows Auto Match to overwrite existing channel logos."},
+          "label": "Group settings",
+          "description": "Group: The channel group to match."},
+        {"id": "automatic_strategy_help", "type": "info", "section": "automatic_assignment",
+         "description": "Strategy: Start with Standard, which uses names and station information. Standard + fuzzy also considers similar names."},
+        {"id": "automatic_scope_help", "type": "info", "section": "automatic_assignment",
+         "description": "Path scope: Choose a catalog folder or Entire catalog. We recommend a country folder unless the group contains channels from multiple countries. Catalog filters still apply."},
+        {"id": "automatic_replace_help", "type": "info", "section": "automatic_assignment",
+         "description": "Replace: Allows Auto Match to overwrite existing channel logos."},
         *([{"id": "automatic_missing_groups", "type": "info", "section": "automatic_assignment",
             "label": "Unavailable saved groups", "description": "These saved group IDs are not currently used by channels: " + ", ".join(sorted(unavailable_groups)) + ". They are not selectable or active."}] if unavailable_groups else []),
         {"id": "automatic_groups", "type": "table", "section": "automatic_assignment", "label": "Group matching settings", "default": [],
@@ -158,16 +171,17 @@ def make_fields(data_dir, settings, channels, groups=()):
          "label": "Fuzzy threshold (%)", "default": 90,
          "description": "Used by all Standard + fuzzy groups. Scores must be strictly above this value; 100 cannot match."},
         {"id": "automatic_variant", "type": "select", "section": "automatic_advanced",
-         "label": "Logo variant preference", "default": "strict", "options": [
+          "label": "Logo variant preference", "default": "standard", "options": [
              {"value": "strict", "label": "Skip ambiguous variants"},
-             {"value": "standard", "label": "Prefer standard variant"}],
-         "description": "Prefer standard selects an unmarked logo only when all candidates belong to the same recognized HD or horizontal variant family; other ties are skipped."},
+              {"value": "standard", "label": "Prefer standard variant"},
+              {"value": "hd", "label": "Prefer HD variant"}],
+          "description": "Preferences apply only within one recognized variant family. Prefer HD chooses the HD logo with the fewest additional variant attributes, or a standard logo if no HD variant is available. Unresolved ties are skipped."},
         {"id": "automatic_generic_fallback", "type": "boolean", "section": "automatic_advanced",
-         "label": "Allow generic network logos", "default": False,
+          "label": "Allow generic network logos", "default": True,
          "description": "For unmatched channels with an explicit station call sign, allow an exact network name to stand in for the station. This may assign the same network logo to multiple cities; manual mappings still take priority."},
         {"id": "automatic_guide_signals", "type": "boolean", "section": "automatic_advanced",
-         "label": "Use guide IDs as a station hint", "default": False,
-         "description": "Use a station call sign from the guide ID only when the channel name agrees on the network. Guide IDs can be stale or change; network agreement cannot verify the city."},
+          "label": "Use channel TVG ID as a station hint", "default": False,
+          "description": "Use a station call sign from the channel's TVG ID, not its matched EPG entry, only when the channel name agrees on the network. The channel's override takes precedence when set. TVG IDs can be stale or change; network agreement cannot verify the city."},
         {"id": "catalog_filters_section", "type": "section", "label": "Catalog filters", "collapsed": True},
         {"id": "catalog_filter_instructions", "type": "info", "section": "catalog_filters_section",
          "description": "Filters match full paths without regard to case. They limit logo choices, Auto Match scopes and candidates. Save and reload to update choices. Saved manual mappings remain available."},
@@ -180,6 +194,15 @@ def make_fields(data_dir, settings, channels, groups=()):
                  {"value": f"{operation}_{kind}", "label": f"{operation.title()} {kind.replace('_', ' ')}"}
                  for operation in ("include", "exclude") for kind in MATCH_TYPES
              ]},
-             {"id": "text", "label": "Text", "type": "string"},
-         ]},
+              {"id": "text", "label": "Text", "type": "string"},
+          ]},
+        {"id": "scheduled_tasks", "type": "section", "label": "Scheduled Tasks", "collapsed": True},
+        {"id": "scheduled_tasks_help", "type": "info", "section": "scheduled_tasks",
+         "description": "Choose Disabled, Interval, or Cron for each task. Enter whole hours for Interval or five cron fields (minute hour day month weekday) for Cron. Cron uses UTC. Save settings to apply changes. Refresh does not run Auto Match."},
+        *([{"id": "scheduled_tasks_errors", "type": "info", "section": "scheduled_tasks", "label": "Schedule errors", "description": " ".join(schedule_errors)}] if schedule_errors else []),
+        *[field for key, label in (("automatic", "Auto Match"), ("catalog", "Catalog refresh")) for field in (
+            {"id": f"schedule_{key}_mode", "type": "select", "section": "scheduled_tasks", "label": f"{label} schedule", "default": "disabled", "options": [
+                {"value": "disabled", "label": "Disabled"}, {"value": "interval", "label": "Interval"}, {"value": "cron", "label": "Cron"}]},
+            {"id": f"schedule_{key}_value", "type": "string", "section": "scheduled_tasks", "label": f"{label} interval or cron", "default": "", "description": "Whole hours, or a five-field UTC cron expression."},
+        )],
     ]

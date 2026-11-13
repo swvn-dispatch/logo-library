@@ -6,6 +6,7 @@ import re
 from .catalog_scope import scoped_paths
 from .variants import select_variant
 from .name_matching import normalize_name
+from .candidates import candidate_details
 
 # Only station-looking, uppercase channel tokens are extracted. A call sign
 # alone does not establish station identity outside station-specific paths.
@@ -65,5 +66,5 @@ def match_callsign(channel_name, index, variant="strict", catalog_id=None):
         return {"path": None, "reason": "no_match"}
     selected = select_variant(candidates, variant, catalog_id)
     if selected is None:
-        return {"path": None, "reason": "ambiguous"}
+        return {"path": None, "reason": "ambiguous", **candidate_details(candidates)}
     return {"path": selected, "reason": None}

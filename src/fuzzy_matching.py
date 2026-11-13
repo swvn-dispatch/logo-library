@@ -5,6 +5,7 @@ import re
 
 from .name_matching import normalize_name
 from .variants import select_variant
+from .candidates import candidate_details
 
 
 def _compatible(left, right):
@@ -40,8 +41,8 @@ def match_fuzzy(channel_name, index, threshold, prefix="", prefix_mode="literal"
     if best_score is None or not best_paths:
         return {"path": None, "reason": "no_match", "score": None}
     if best_score <= threshold:
-        return {"path": None, "reason": "below_threshold", "score": best_score}
+        return {"path": None, "reason": "below_threshold", "score": best_score, **candidate_details(best_paths, best_score)}
     selected = select_variant(best_paths, variant, catalog_id)
     if selected is None:
-        return {"path": None, "reason": "ambiguous", "score": best_score}
+        return {"path": None, "reason": "ambiguous", "score": best_score, **candidate_details(best_paths, best_score)}
     return {"path": selected, "reason": None, "score": best_score}

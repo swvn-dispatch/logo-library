@@ -56,8 +56,8 @@ def configuration_snapshot(settings, group_options, channels=()):
             "prefix_mode": scalar(settings.get("automatic_prefix_mode", "literal")),
             "prefix_rules": rules,
             "fuzzy_threshold": scalar(settings.get("automatic_threshold", 90)),
-            "variant_preference": scalar(settings.get("automatic_variant", "strict")),
-            "generic_network_fallback": scalar(settings.get("automatic_generic_fallback", False)),
+            "variant_preference": scalar(settings.get("automatic_variant", "standard")),
+            "generic_network_fallback": scalar(settings.get("automatic_generic_fallback", True)),
             "guide_id_signals": scalar(settings.get("automatic_guide_signals", False)),
         },
         "catalog_filters": filters,
@@ -126,10 +126,10 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
                     re.compile(prefix, re.IGNORECASE)
                 except re.error as exc:
                     raise ValueError(f"Invalid prefix regex: {exc}") from exc
-            variant = settings.get("automatic_variant", "strict") or "strict"
-            if variant not in {"strict", "standard"}:
+            variant = settings.get("automatic_variant", "standard") or "standard"
+            if variant not in {"strict", "standard", "hd"}:
                 raise ValueError("Unknown variant preference")
-            generic = settings.get("automatic_generic_fallback", False)
+            generic = settings.get("automatic_generic_fallback", True)
             if not isinstance(generic, bool):
                 raise ValueError("Generic network fallback must be a boolean")
             guide = settings.get("automatic_guide_signals", False)

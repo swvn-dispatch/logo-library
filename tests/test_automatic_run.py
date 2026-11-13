@@ -33,6 +33,31 @@ class AutomaticRunTests(unittest.TestCase):
     def run_match(self, channels, assign=None):
         return run_automatic("/data", self.settings, channels, [1], [self.catalog], assign or self.assign)
 
+    def test_report_candidates_respect_scope_and_include_similarity(self):
+        self.catalog.options = lambda _: ["countries/united-states/news-us.png", "countries/canada/newsy-ca.png"]
+        self.settings["automatic_groups"][0]["strategy"] = "fuzzy"
+        self.settings["automatic_threshold"] = 100
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "Newsy"}])
+        entry = result["channels"][0]
+        self.assertEqual(entry["reason"], "below_threshold")
+        self.assertEqual(entry["candidates"][0]["path"], "tv_logos:countries/united-states/news-us.png")
+        self.assertGreater(entry["candidates"][0]["similarity"], 0)
+        self.assertEqual(self.calls, [])
+
+    def test_ambiguous_candidates_respect_catalog_filters(self):
+        base = "countries/united-states/news-us.png"
+        hd = "countries/united-states/hd/news-hd-us.png"
+        horizontal = "countries/united-states/news-hz-us.png"
+        self.catalog.options = lambda _: [base, hd, horizontal]
+        self.settings["automatic_variant"] = "strict"
+        self.settings["catalog_filters"] = [{"mode": "exclude_contains", "text": "/hd/"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "News"}])
+        entry = result["channels"][0]
+        self.assertEqual(entry["reason"], "ambiguous")
+        self.assertEqual({c["path"] for c in entry["candidates"]}, {f"tv_logos:{base}", f"tv_logos:{horizontal}"})
+        self.assertTrue(all("similarity" not in c for c in entry["candidates"]))
+        self.assertEqual(self.calls, [])
+
     def test_applies_matches_once_and_caches_index(self):
         result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"},
                                  {"id": 2, "group_id": 1, "name": "News"}])
