@@ -73,7 +73,6 @@ def cron_matches(schedule, timestamp):
 def action_lock(data_dir, action):
     """Skip overlapping manual and scheduled executions of the same action."""
     root = Path(data_dir)
-    root.mkdir(parents=True, exist_ok=True)
     with (root / f"schedule-action-{action}.lock").open("a+b") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -101,7 +100,6 @@ def tick(data_dir, settings, dispatch, now=None):
     """Claim due slots under a shared lock before publishing tasks."""
     now = time.time() if now is None else now
     root = Path(data_dir)
-    root.mkdir(parents=True, exist_ok=True)
     with (root / "schedule-state.lock").open("a+b") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         try:

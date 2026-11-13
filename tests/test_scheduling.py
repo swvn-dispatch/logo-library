@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from src.scheduling import action_lock, cron_matches, parse_schedule, run_service, tick
 
@@ -72,6 +72,13 @@ class SchedulingTests(unittest.TestCase):
                         self.assertTrue(first)
                         self.assertFalse(second)
                         self.assertTrue(other)
+
+    def test_scheduler_uses_existing_data_directory(self):
+        with tempfile.TemporaryDirectory() as root, patch("pathlib.Path.mkdir") as mkdir:
+            with action_lock(root, "run_automatic") as acquired:
+                self.assertTrue(acquired)
+            tick(root, {}, Mock(), 0)
+            mkdir.assert_not_called()
 
     def test_concurrent_leaders_claim_once(self):
         settings = {"schedule_catalog_mode": "interval", "schedule_catalog_value": "1"}
