@@ -6,6 +6,18 @@ MATCH_TYPES = ("contains", "starts_with", "exact", "regex")
 MODES = tuple(f"{operation}_{kind}" for operation in ("include", "exclude") for kind in MATCH_TYPES)
 
 
+def filter_snapshot(rows):
+    """Return serializable saved filter settings for task results."""
+    if not isinstance(rows, list):
+        return "<invalid>"
+
+    def scalar(value):
+        return value if value is None or isinstance(value, (str, int, float, bool)) else "<invalid>"
+
+    return [{key: scalar(row.get(key)) for key in ("mode", "text", "catalog")}
+            if isinstance(row, dict) else {"invalid": True} for row in rows]
+
+
 def catalog_filter_rules(rows, catalogs):
     """Compile filters using the same catalog defaults for settings and runs."""
     catalog_ids = {catalog.id for catalog in catalogs}

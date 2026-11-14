@@ -10,6 +10,7 @@ from .dispatcharr import (assign_logo, automatic_channels, channel_options, disp
 from .automatic_run import run_automatic
 from .automatic import configuration_snapshot
 from .fields import make_fields
+from .filters import filter_snapshot
 from .mappings import apply_mappings, manual_configuration_snapshot
 from . import catalogs
 from .scheduling import action_lock, run_service
@@ -107,6 +108,7 @@ class Plugin:
                 logger.warning("Could not retrieve channel numbers for Manual Match results", exc_info=True)
                 channels = []
             configuration = manual_configuration_snapshot(settings.get("mappings", []), channels)
+            configuration["catalog_filters"] = filter_snapshot(settings.get("catalog_filters", []))
             result = apply_mappings(context["data_dir"], settings.get("mappings", []), assign)
             status = "partial" if result["skipped"] else "ok"
             channel_by_id = {str(channel["id"]): channel for channel in channels}
