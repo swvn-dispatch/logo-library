@@ -120,10 +120,11 @@ save, and run Manual Match. Until completed or removed, blank mappings prevent
 Auto Match from matching those channels. The action requires an available task
 result and its stored channel identities.
 
-The Manual Match result includes the saved manual mapping definitions used for
-the run. The Auto Match result instead includes its group settings, ignored
-channels, catalog filters and advanced settings, including channel hints and
-ignore patterns.
+The Manual Match result includes the saved manual mapping definitions. The
+Auto Match result includes its group settings, ignored channels and advanced
+settings, including channel hints and ignore patterns. Both results include
+saved catalog filters. Filters do not prevent saved manual mappings from being
+applied.
 All action results include the plugin and Dispatcharr versions. Development
 versions include the Dispatcharr build timestamp when available; an unavailable
 Dispatcharr version is reported as `unknown`.

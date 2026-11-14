@@ -525,10 +525,23 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(manual["plugin_version"], Plugin.version)
         self.assertEqual(manual["configuration"], {"snapshot": "start_of_run", "mappings": [
             {"row": 1, "channel": "7", "name": "News", "logo": "tv_logos:news.png", "ignore": None},
-            {"row": 2, "channel": None, "name": None, "logo": None, "ignore": True}]})
+            {"row": 2, "channel": None, "name": None, "logo": None, "ignore": True}],
+            "catalog_filters": [{"mode": "include_contains", "text": "us", "catalog": None}]})
         self.assertEqual(automatic["configuration"]["advanced"]["fuzzy_threshold"], 93)
-        self.assertEqual(automatic["configuration"]["catalog_filters"][0]["text"], "us")
+        self.assertEqual(automatic["configuration"]["catalog_filters"], manual["configuration"]["catalog_filters"])
         self.assertNotIn("mappings", automatic["configuration"])
+
+    def test_manual_filter_snapshot_handles_invalid_settings(self):
+        report = {"applied": 0, "skipped": 0, "errors": []}
+        with patch("src.automatic_channels", return_value=[]), patch("src.apply_mappings", return_value=report):
+            for filters, expected in (("invalid", "<invalid>"),
+                                      ([None, {"text": {"secret": "hidden"}}],
+                                       [{"invalid": True}, {"mode": None, "text": "<invalid>", "catalog": None}]),
+                                      ([], [])):
+                with self.subTest(filters=filters):
+                    result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": {"catalog_filters": filters}})
+                    self.assertEqual(result["configuration"]["catalog_filters"], expected)
+                    self.assertNotIn("hidden", json.dumps(result))
 
     def test_manual_match_does_not_retrieve_group_labels(self):
         report = {"applied": 1, "skipped": 0, "errors": []}

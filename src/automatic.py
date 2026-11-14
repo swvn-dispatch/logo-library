@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 import re
 
 from .mappings import automatic_ignored_channels
+from .filters import filter_snapshot
 from .name_cleanup import cleanup_rows, compile_cleanup
 
 
@@ -35,12 +36,7 @@ def configuration_snapshot(settings, group_options, channels=()):
                  if isinstance(row, dict) else {"invalid": True} for row in rules]
     else:
         rules = "<invalid>"
-    filters = settings.get("catalog_filters", [])
-    if isinstance(filters, list):
-        filters = [{key: scalar(row.get(key)) for key in ("mode", "text", "catalog")}
-                   if isinstance(row, dict) else {"invalid": True} for row in filters]
-    else:
-        filters = "<invalid>"
+    filters = filter_snapshot(settings.get("catalog_filters", []))
     def pattern_snapshot(key, columns):
         rows = settings.get(key, [])
         if not isinstance(rows, list):
