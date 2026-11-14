@@ -1,5 +1,6 @@
 """Dispatcharr channel and logo integration."""
 
+import ast
 import hashlib
 import json
 import logging
@@ -11,6 +12,33 @@ import uuid
 
 LOGO_DIR = Path("/data/logos")
 logger = logging.getLogger(__name__)
+
+
+def dispatcharr_version():
+    """Read Dispatcharr's version and retain the timestamp on development builds."""
+    try:
+        import version
+        release = getattr(version, "__version__", None)
+        timestamp = getattr(version, "__timestamp__", None)
+    except Exception:
+        release, timestamp = None, None
+    if not isinstance(release, str) or not release.strip():
+        try:
+            tree = ast.parse(Path("/app/version.py").read_text(encoding="utf-8"))
+            values = {}
+            for node in tree.body:
+                if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                    if node.targets[0].id in {"__version__", "__timestamp__"}:
+                        values[node.targets[0].id] = ast.literal_eval(node.value)
+            release, timestamp = values.get("__version__"), values.get("__timestamp__")
+        except (OSError, SyntaxError, ValueError, TypeError):
+            return "unknown"
+    if not isinstance(release, str) or not release.strip():
+        return "unknown"
+    release = release.strip()
+    if isinstance(timestamp, str) and timestamp.strip():
+        return f"v{release.removeprefix('v')}-{timestamp.strip()}"
+    return release
 
 
 def assign_logo(channel_id, relative, image, logo_dir=LOGO_DIR):

@@ -6,10 +6,27 @@ import types
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.dispatcharr import assign_logo, automatic_channels, channel_options, group_options, guarded_assign_logo, ignore_latest_skipped
+from src.dispatcharr import assign_logo, automatic_channels, channel_options, dispatcharr_version, group_options, guarded_assign_logo, ignore_latest_skipped
 
 
 class DispatcharrTests(unittest.TestCase):
+    def test_dispatcharr_version_includes_dev_timestamp(self):
+        version = types.ModuleType("version")
+        version.__version__ = "0.33.0"
+        version.__timestamp__ = "20261114162620"
+        with patch.dict(sys.modules, {"version": version}):
+            self.assertEqual(dispatcharr_version(), "v0.33.0-20261114162620")
+            version.__version__ = "v0.33.0"
+            self.assertEqual(dispatcharr_version(), "v0.33.0-20261114162620")
+            version.__timestamp__ = None
+            self.assertEqual(dispatcharr_version(), "v0.33.0")
+
+    def test_dispatcharr_version_file_fallback_and_unknown(self):
+        with patch.dict(sys.modules, {"version": None}), patch("src.dispatcharr.Path.read_text", return_value="__version__ = '0.33.0'\n__timestamp__ = '20261114162620'\n"):
+            self.assertEqual(dispatcharr_version(), "v0.33.0-20261114162620")
+        with patch.dict(sys.modules, {"version": None}), patch("src.dispatcharr.Path.read_text", side_effect=OSError):
+            self.assertEqual(dispatcharr_version(), "unknown")
+
     def test_ignore_latest_skipped_merges_and_handles_missing_history(self):
         plugin = MagicMock(settings={"mappings": [{"channel": "1", "ignore": True}]})
         model = MagicMock()

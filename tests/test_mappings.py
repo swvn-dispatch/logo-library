@@ -9,10 +9,16 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.catalogs.tv_logos.catalog import update_catalog
-from src.mappings import apply_mappings
+from src.mappings import apply_mappings, manual_configuration_snapshot
 
 
 class MappingTests(unittest.TestCase):
+    def test_manual_snapshot_handles_invalid_rows_and_missing_channels(self):
+        self.assertEqual(manual_configuration_snapshot("invalid")["mappings"], "<invalid>")
+        snapshot = manual_configuration_snapshot([None, {"channel": "1", "logo": {"secret": "hidden"}, "ignore": []}])
+        self.assertEqual(snapshot["mappings"], [{"row": 1, "invalid": True},
+                         {"row": 2, "channel": None, "name": None, "logo": "<invalid>", "ignore": "<invalid>"}])
+
     def test_ignored_rows_need_no_logo_and_never_assign(self):
         calls = []
         rows = [{"channel": "1", "ignore": True}, {"channel": "2", "ignore": True, "logo": "old.png"}]

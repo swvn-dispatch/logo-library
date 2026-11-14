@@ -5,6 +5,26 @@ from collections import Counter
 from . import catalogs
 
 
+def manual_configuration_snapshot(rows, channels=()):
+    """Describe manual definitions without exposing internal channel IDs."""
+    if not isinstance(rows, list):
+        return {"snapshot": "start_of_run", "mappings": "<invalid>"}
+    channel_by_id = {str(channel["id"]): channel for channel in channels}
+
+    def scalar(value):
+        return value if value is None or isinstance(value, (str, int, float, bool)) else "<invalid>"
+
+    mappings = []
+    for index, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            mappings.append({"row": index, "invalid": True})
+            continue
+        channel = channel_by_id.get(str(row.get("channel")), {})
+        mappings.append({"row": index, "channel": channel.get("number"), "name": channel.get("name"),
+                         "logo": scalar(row.get("logo")), "ignore": scalar(row.get("ignore"))})
+    return {"snapshot": "start_of_run", "mappings": mappings}
+
+
 def automatic_ignored_channels(settings):
     """Return ignored IDs, retaining old checked rows until the list is saved."""
     if "automatic_ignored_channels" not in settings:

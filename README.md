@@ -103,6 +103,14 @@ missing channels and unavailable logo files are skipped; other valid mappings
 can still be applied. Removing a mapping does not remove or restore its assigned
 logo.
 
+The Manual Match result includes the saved manual mapping definitions used for
+the run. The Auto Match result instead includes its group settings, ignored
+channels, catalog filters and advanced settings, including channel hints and
+ignore patterns.
+All action results include the plugin and Dispatcharr versions. Development
+versions include the Dispatcharr build timestamp when available; an unavailable
+Dispatcharr version is reported as `unknown`.
+
 Selected images are copied into Dispatcharr's local logo directory. Assigned
 logos remain available if the plugin is disabled or the catalog is unreachable.
 After a catalog update, run Manual Match again to refresh assigned copies.

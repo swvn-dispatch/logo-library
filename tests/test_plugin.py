@@ -444,6 +444,12 @@ class PluginTests(unittest.TestCase):
             "automatic_prefix_rules": [{"group": "1", "mode": "regex", "prefix": "^CA"}],
             "automatic_variant": "standard", "automatic_guide_signals": True,
             "automatic_ignored_channels": ["7", "2"],
+            "automatic_channel_hints": [{"mode": "starts_with", "text": "CA |", "case_sensitive": True,
+                                         "path_mode": "contains", "path_text": "canada"},
+                                        {"mode": "regex", "text": "^US", "case_sensitive": False,
+                                         "path_mode": "regex", "path_text": "united"}],
+            "automatic_ignore_patterns": [{"mode": "contains", "text": "test", "case_sensitive": False},
+                                           {"mode": "regex", "text": "^OLD", "case_sensitive": True}],
             "catalog_filters": [{"mode": "include_contains", "text": "canada"},
                                 {"mode": "exclude_regex", "text": "old", "catalog": "tv_logos"}],
             "mappings": [{"channel": "secret-channel", "logo": "secret-logo"}],
@@ -464,49 +470,61 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(advanced["prefix_rules"], [{"group": "1", "mode": "regex", "prefix": "^CA"}])
         self.assertEqual(advanced["fuzzy_threshold"], 90)
         self.assertTrue(advanced["guide_id_signals"])
+        self.assertEqual(advanced["channel_hints"], settings["automatic_channel_hints"])
+        self.assertEqual(advanced["ignore_patterns"], settings["automatic_ignore_patterns"])
         self.assertEqual(result["configuration"]["catalog_filters"], [
             {"mode": "include_contains", "text": "canada", "catalog": None},
             {"mode": "exclude_regex", "text": "old", "catalog": "tv_logos"},
         ])
         self.assertNotIn("secret", json.dumps(result))
 
-    def test_manual_and_automatic_share_configuration_snapshot(self):
+    def test_manual_and_automatic_have_separate_configuration_snapshots(self):
         settings = {"automatic_groups": [{"group": "1", "strategy": "exact"}],
                     "automatic_threshold": 93,
                     "catalog_filters": [{"mode": "include_contains", "text": "us"}],
-                    "mappings": [{"channel": "private-channel", "logo": "private-logo"}]}
+                    "automatic_channel_hints": [{"mode": "contains", "text": "hint", "path_mode": "contains", "path_text": "us"}],
+                    "automatic_ignore_patterns": [{"mode": "contains", "text": "ignore"}],
+                    "mappings": [{"channel": "42", "logo": "tv_logos:news.png"}, {"channel": "99", "ignore": True}]}
         auto_report = {"applied": 0, "skipped": 0, "failed": 0, "configuration_errors": [], "channels": []}
         manual_report = {"applied": 1, "skipped": 0, "errors": []}
         with patch("src.group_options", return_value=[{"value": "1", "label": "Locals"}]), \
-             patch("src.automatic_channels", return_value=[]), patch("src.run_automatic", return_value=auto_report), \
+             patch("src.automatic_channels", return_value=[{"id": 42, "number": "7", "name": "News"}]), patch("src.run_automatic", return_value=auto_report), \
              patch("src.apply_mappings", return_value=manual_report):
             manual = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings})
             automatic = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": settings})
         self.assertEqual(manual["plugin_version"], Plugin.version)
-        self.assertEqual(manual["configuration"], automatic["configuration"])
-        self.assertEqual(manual["configuration"]["advanced"]["fuzzy_threshold"], 93)
-        self.assertEqual(manual["configuration"]["catalog_filters"][0]["text"], "us")
-        self.assertNotIn("private", json.dumps(manual))
+        self.assertEqual(manual["configuration"], {"snapshot": "start_of_run", "mappings": [
+            {"row": 1, "channel": "7", "name": "News", "logo": "tv_logos:news.png", "ignore": None},
+            {"row": 2, "channel": None, "name": None, "logo": None, "ignore": True}]})
+        self.assertEqual(automatic["configuration"]["advanced"]["fuzzy_threshold"], 93)
+        self.assertEqual(automatic["configuration"]["catalog_filters"][0]["text"], "us")
+        self.assertNotIn("mappings", automatic["configuration"])
 
-    def test_manual_match_continues_if_group_labels_are_unavailable(self):
+    def test_manual_match_does_not_retrieve_group_labels(self):
         report = {"applied": 1, "skipped": 0, "errors": []}
         settings = {"automatic_groups": [{"group": "1", "strategy": "exact"}], "mappings": []}
-        with patch("src.group_options", side_effect=RuntimeError("unavailable")), \
-             patch("src.apply_mappings", return_value=report), self.assertLogs("src", level="WARNING"):
+        with patch("src.group_options", side_effect=RuntimeError("unavailable")) as groups, \
+             patch("src.automatic_channels", return_value=[]), patch("src.apply_mappings", return_value=report):
             result = Plugin().run("apply_changes", {}, {"data_dir": "/x", "settings": settings})
         self.assertEqual(result["applied"], 1)
-        self.assertIsNone(result["configuration"]["groups"][0]["group_name"])
+        self.assertEqual(result["configuration"]["mappings"], [])
+        groups.assert_not_called()
 
     def test_automatic_action_handles_invalid_configuration_snapshot(self):
         report = {"applied": 0, "skipped": 0, "failed": 0, "configuration_errors": ["bad"], "channels": []}
         settings = {"automatic_groups": [{"group": ["invalid"], "strategy": {"secret": "hidden"}}, None],
-                    "automatic_prefix_rules": "invalid", "catalog_filters": [None, {"text": {"secret": "hidden"}}]}
+                    "automatic_prefix_rules": "invalid", "catalog_filters": [None, {"text": {"secret": "hidden"}}],
+                    "automatic_channel_hints": [None, {"mode": {"secret": "hidden"}}],
+                    "automatic_ignore_patterns": "invalid"}
         with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[]), \
              patch("src.run_automatic", return_value=report):
             result = Plugin().run("run_automatic", {}, {"data_dir": "/x", "settings": settings})
         self.assertEqual(result["configuration"]["groups"][0]["strategy"], "<invalid>")
         self.assertEqual(result["configuration"]["groups"][1], {"row": 2, "invalid": True})
         self.assertEqual(result["configuration"]["advanced"]["prefix_rules"], "<invalid>")
+        self.assertEqual(result["configuration"]["advanced"]["channel_hints"], [
+            {"invalid": True}, {"mode": "<invalid>", "text": None, "case_sensitive": None, "path_mode": None, "path_text": None}])
+        self.assertEqual(result["configuration"]["advanced"]["ignore_patterns"], "<invalid>")
         self.assertEqual(result["configuration"]["catalog_filters"], [
             {"invalid": True}, {"mode": None, "text": "<invalid>", "catalog": None},
         ])
@@ -514,6 +532,23 @@ class PluginTests(unittest.TestCase):
 
     def test_unknown_action(self):
         self.assertEqual(Plugin().run("unknown", {}, {})["status"], "error")
+
+    def test_all_action_results_include_versions(self):
+        from contextlib import nullcontext
+        with patch("src.dispatcharr_version", return_value="v0.33.0-20261114162620"), \
+             patch.object(Plugin, "_run", return_value={"status": "ok"}), \
+             patch("src.action_lock", return_value=nullcontext(True)):
+            for action in ("run_automatic", "apply_changes", "update_catalog", "ignore_skipped", "unknown"):
+                with self.subTest(action=action):
+                    result = Plugin().run(action, {}, {"data_dir": "/x"})
+                    self.assertEqual(result["plugin_version"], Plugin.version)
+                    self.assertEqual(result["dispatcharr_version"], "v0.33.0-20261114162620")
+        with patch("src.dispatcharr_version", return_value="unknown"), \
+             patch("src.action_lock", return_value=nullcontext(False)):
+            result = Plugin().run("run_automatic", {}, {"data_dir": "/x"})
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["plugin_version"], Plugin.version)
+            self.assertEqual(result["dispatcharr_version"], "unknown")
 
     def test_catalog_action_is_routed_to_catalog(self):
         with patch("src.catalogs.tv_logos.update_catalog", return_value=3) as update:
