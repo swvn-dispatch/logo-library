@@ -48,9 +48,12 @@ class DispatcharrTests(unittest.TestCase):
         with patch.dict(sys.modules, modules):
             result = ignore_latest_skipped("/plugin")
             self.assertEqual(plugin.settings["automatic_ignored_channels"], ["1", "2"])
-            self.assertIn("Reload the plugin", result["message"])
+            self.assertEqual(result["_dispatcharr"], {"refresh": "ui"})
+            self.assertNotIn("Reload", result["message"])
             plugin.save.assert_called_once_with(update_fields=["settings"])
-            self.assertIn("Added 0", ignore_latest_skipped("/plugin")["message"])
+            unchanged = ignore_latest_skipped("/plugin")
+            self.assertIn("Added 0", unchanged["message"])
+            self.assertEqual(unchanged["_dispatcharr"], {"refresh": "ui"})
             history.get_task_history.return_value[0]["result"] = {"channels": [{"channel": "12.5", "status": "skipped"}],
                                                                   "channel_numbers": True,
                                                                   "ignored_channel_reference": "a" * 32}
@@ -61,7 +64,9 @@ class DispatcharrTests(unittest.TestCase):
                 "success": [], "skipped": [{"channel": "12.5", "status": "skipped"}], "failed": []}
             self.assertIn("Added 0", ignore_latest_skipped("/plugin")["message"])
             history._client.return_value.get.return_value = None
-            self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
+            failed = ignore_latest_skipped("/plugin")
+            self.assertEqual(failed["status"], "error")
+            self.assertNotIn("_dispatcharr", failed)
             plugin.settings["automatic_ignored_channels"] = "invalid"
             history._client.return_value.get.return_value = '["4"]'
             self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
@@ -94,6 +99,7 @@ class DispatcharrTests(unittest.TestCase):
         with patch.dict(sys.modules, modules):
             result = map_latest_skipped("/plugin")
             self.assertIn("Added 2", result["message"])
+            self.assertEqual(result["_dispatcharr"], {"refresh": "ui"})
             self.assertIn("prevent Auto Match", result["message"])
             self.assertEqual(plugin.settings["mappings"], [{"channel": "01", "logo": "existing.png"},
                 {"channel": 2}, {"channel": "3", "ignore": True}, {"channel": "4", "logo": ""},
@@ -111,7 +117,9 @@ class DispatcharrTests(unittest.TestCase):
                 "channel_numbers": True, "ignored_channel_reference": "a" * 32,
                 "channels": {"success": [], "skipped": [{"channel": "12.5", "status": "skipped"}], "failed": []}}
             history._client.return_value.get.return_value = None
-            self.assertEqual(map_latest_skipped("/plugin")["status"], "error")
+            failed = map_latest_skipped("/plugin")
+            self.assertEqual(failed["status"], "error")
+            self.assertNotIn("_dispatcharr", failed)
             history.get_task_history.return_value[0]["status"] = "running"
             self.assertEqual(map_latest_skipped("/plugin")["status"], "error")
 

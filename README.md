@@ -16,7 +16,8 @@ This project is maintained in my spare time. If it's saved you some headaches, a
 
 1. Enable Logo Library and approve its requested capabilities. The initial
    catalog download runs in the background.
-2. When the download completes, click **Reload plugin** and reopen its settings.
+2. Wait for the catalog download to complete. Logo and folder choices update
+   automatically.
 3. Under **Automatic assignment**, add a row for each channel group to match.
    Choose a strategy and catalog folder, then save your settings.
 4. Run **Auto Match** and review the results for skipped and failed channels.
@@ -48,8 +49,7 @@ groups are omitted from results; configuration errors are reported.
 Use **Channels to ignore** below the group table to exclude individual channels
 from Auto Match. This does not prevent an explicit Manual Match. To add all
 skipped and failed channels from the latest Auto Match result, run **Ignore
-skipped and failed channels**, then reload the plugin and reopen its settings.
-The action needs an available task result.
+skipped and failed channels**. The action needs an available task result.
 
 Complete manual mappings and ignored channels are reported as preserved or
 ignored rather than skipped. A preserved mapping has not necessarily been
@@ -113,8 +113,8 @@ can still be applied. Removing a mapping does not remove or restore its assigned
 logo.
 
 To prepare manual mappings for skipped and failed channels from the latest Auto
-Match, run **Create manual mappings for skipped and failed channels**, then
-reload the plugin and reopen its settings. The action adds blank rows without
+Match, run **Create manual mappings for skipped and failed channels**. The
+action adds blank rows without
 duplicating existing channels or choosing logos. Select a logo for each row,
 save, and run Manual Match. Until completed or removed, blank mappings prevent
 Auto Match from matching those channels. The action requires an available task
@@ -143,11 +143,15 @@ Includes are combined; any matching exclusion removes a path. Saved manual
 mappings remain available even if filtered out. Invalid filter settings stop
 Auto Match until corrected.
 
-Use **Refresh tv-logos downloaded catalog** to download the latest catalog. Save settings, reload
-the plugin and reopen its settings to refresh choices after changing filters or
-updating the catalog. Catalog updates do not automatically assign logos.
-Dispatcharr caches field options per process, so confirm that settings saved
-successfully after a reload.
+Use **Refresh tv-logos downloaded catalog** to download the latest catalog and
+update the available choices. Catalog updates do not automatically assign
+logos. After changing filters, save settings and reload the plugin to rebuild
+the filtered logo and folder choices. Auto Match uses saved filters even before
+the choices are rebuilt.
+
+The actions that add ignored channels or manual mappings refresh saved settings
+in the UI. Unsaved edits to the same settings take precedence over the refreshed
+values. If channel choices are stale, reload the plugin to rebuild them.
 
 ## Scheduled Tasks
 
@@ -195,5 +199,5 @@ The catalog is downloaded locally when the plugin is enabled. Use
 **Refresh tv-logos downloaded catalog** to refresh it. The current and previous snapshots are
 retained, and updates need temporary space for the archive and extracted images.
 Logo choices come from a cached index rather than a filesystem scan at worker
-startup. Existing installations build a missing index in the background. Reload
-the plugin and reopen its settings once indexing completes.
+startup. Existing installations build a missing index in the background and
+refresh the available choices when indexing completes.

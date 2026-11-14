@@ -117,7 +117,7 @@ def make_fields(data_dir, settings, channels, groups=()):
     ]
     return [
         {"id": "instructions", "type": "info", "label": "Catalog and mappings",
-         "description": "After a catalog is downloaded, refreshed, or indexed, it is recommended to click Reload plugin."},
+         "description": "Catalog updates refresh the available logo and folder choices."},
         {"id": "manual_assignment", "type": "section", "label": "Manual assignment", "collapsed": False},
         {"id": "manual_instructions", "type": "info", "section": "manual_assignment",
          "description": "Save mappings before running Manual Match. Removing a row does not remove the assigned logo."},
@@ -228,7 +228,7 @@ def make_fields(data_dir, settings, channels, groups=()):
           "description": "Use a station call sign from the channel's TVG ID, not its matched EPG entry, only when the channel name agrees on the network. The channel's override takes precedence when set. TVG IDs can be stale or change; network agreement cannot verify the city."},
         {"id": "catalog_filters_section", "type": "section", "label": "Catalog filters", "collapsed": True},
         {"id": "catalog_filter_instructions", "type": "info", "section": "catalog_filters_section",
-         "description": "Filters match full paths without regard to case. They limit logo choices, Auto Match scopes and candidates. Save and reload to update choices. Saved manual mappings remain available."},
+         "description": "Filters match full paths without regard to case. They limit logo choices, Auto Match scopes and candidates. Saved manual mappings remain available. Logo and folder choices reflect the filters used when plugin fields were last loaded."},
         *([{"id": "catalog_filter_errors", "type": "info", "section": "catalog_filters_section",
             "label": "Filter errors", "description": " ".join(filter_errors) + " Auto Match will not run until these are corrected."}] if filter_errors else []),
         {"id": "catalog_filters", "type": "table", "section": "catalog_filters_section", "label": "Filters", "default": [],

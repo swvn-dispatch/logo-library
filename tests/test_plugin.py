@@ -72,7 +72,7 @@ class PluginTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             fields = make_fields(root, {"mappings": [{"channel": "123", "logo": "old/a.png"}]}, [])
             by_id = {field["id"]: field for field in fields}
-            self.assertIn("Reload plugin", by_id["instructions"]["description"])
+            self.assertIn("update", by_id["instructions"]["description"])
             columns = by_id["mappings"]["columns"]
             self.assertEqual(columns[0]["options"][0]["value"], "123")
             self.assertEqual(columns[1]["options"][0]["value"], "old/a.png")
@@ -318,6 +318,7 @@ class PluginTests(unittest.TestCase):
             self.assertEqual(catalog.options(root), [])
             result = catalog.run(calls[0][0], calls[0][1], context)
             self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["_dispatcharr"], {"refresh": "plugin"})
             self.assertEqual(read_index(snapshot), ["a.png"])
             self.assertEqual(catalog.options(root), ["a.png"])
             catalog.on_leader_acquired(context)
@@ -334,6 +335,25 @@ class PluginTests(unittest.TestCase):
             calls = []
             catalog.on_leader_acquired({"data_dir": root, "dispatch_task": lambda *args: calls.append(args)})
             self.assertEqual(len(calls), 1)
+
+    def test_initial_catalog_download_requests_plugin_refresh_after_completion(self):
+        context = {"data_dir": "/data", "dispatcharr": {"remove_directory": shutil.rmtree}}
+        with patch("src.catalogs.tv_logos.current_catalog", return_value=None), \
+             patch("src.catalogs.tv_logos.update_catalog") as update, \
+             patch("src.catalogs.tv_logos.ensure_index", return_value=4), \
+             patch("src.catalogs.tv_logos.release_initialization") as release:
+            result = TvLogosCatalog().run("update_catalog", {"initial": True, "request_token": "token"}, context)
+        self.assertEqual(result["_dispatcharr"], {"refresh": "plugin"})
+        update.assert_called_once_with("/data", only_if_missing=True, remove_directory=shutil.rmtree)
+        release.assert_called_once_with("/data", "token")
+
+    def test_catalog_refresh_failure_does_not_return_a_refresh_directive(self):
+        context = {"data_dir": "/data", "dispatcharr": {"remove_directory": shutil.rmtree}}
+        with patch("src.catalogs.tv_logos.update_catalog", side_effect=ValueError("failed")), \
+             patch("src.catalogs.tv_logos.release_initialization") as release:
+            with self.assertRaisesRegex(ValueError, "failed"):
+                TvLogosCatalog().run("update_catalog", {}, context)
+        release.assert_called_once_with("/data", None)
 
     def test_action_reports_partial_result(self):
         with patch("src.group_options", return_value=[]), patch("src.automatic_channels", return_value=[{"id": 44, "number": "10.5", "name": "Test"}]), patch("src.apply_mappings", return_value={"applied": 1, "skipped": 1, "errors": [
@@ -604,6 +624,7 @@ class PluginTests(unittest.TestCase):
             result = Plugin().run("update_catalog", {}, {"data_dir": "/test", "dispatcharr": {"remove_directory": shutil.rmtree}})
         self.assertEqual(result["status"], "ok")
         self.assertIn("3", result["message"])
+        self.assertEqual(result["_dispatcharr"], {"refresh": "plugin"})
         update.assert_called_once_with("/test", remove_directory=shutil.rmtree)
 
     def test_options_include_multiple_catalog_namespaces(self):

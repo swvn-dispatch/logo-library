@@ -205,7 +205,8 @@ def ignore_latest_skipped(code_dir):
         if added:
             plugin.settings = {**plugin.settings, "automatic_ignored_channels": sorted(existing | selected, key=int)}
             plugin.save(update_fields=["settings"])
-    return {"status": "ok", "message": f"Added {len(added)} channels to the ignore list. Reload the plugin and reopen settings before editing the list."}
+    return {"status": "ok", "message": f"Added {len(added)} channels to the ignore list.",
+            "_dispatcharr": {"refresh": "ui"}}
 
 
 def map_latest_skipped(code_dir):
@@ -240,7 +241,8 @@ def map_latest_skipped(code_dir):
             plugin.settings = {**plugin.settings, "mappings": mappings + [
                 {"channel": channel, "logo": ""} for channel in sorted(added, key=int)]}
             plugin.save(update_fields=["settings"])
-    return {"status": "ok", "message": f"Added {len(added)} blank manual mappings. Reload the plugin and reopen settings to choose logos. Until completed or removed, these mappings prevent Auto Match for those channels."}
+    return {"status": "ok", "message": f"Added {len(added)} blank manual mappings. Choose a logo for each row. Until completed or removed, these mappings prevent Auto Match for those channels.",
+            "_dispatcharr": {"refresh": "ui"}}
 
 
 def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected, identity, image, assign=None):
