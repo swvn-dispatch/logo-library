@@ -47,9 +47,11 @@ class TvLogosCatalog:
                 count = ensure_index(data_dir)
                 if count is None:
                     raise ValueError("TV Logos catalog is unavailable")
-                return {"status": "ok", "message": f"TV Logos library ready with {count} images. Reload the plugin before editing mappings."}
+                return {"status": "ok", "message": f"TV Logos library ready with {count} images.",
+                        "_dispatcharr": {"refresh": "plugin"}}
             count = update_catalog(data_dir, remove_directory=context["dispatcharr"]["remove_directory"])
-            return {"status": "ok", "message": f"Downloaded {count} TV Logos images. Reload the plugin before editing mappings."}
+            return {"status": "ok", "message": f"Downloaded {count} TV Logos images.",
+                    "_dispatcharr": {"refresh": "plugin"}}
         finally:
             release_initialization(data_dir, params.get("request_token"))
 
