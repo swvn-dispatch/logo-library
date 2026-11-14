@@ -33,6 +33,30 @@ class AutomaticRunTests(unittest.TestCase):
     def run_match(self, channels, assign=None):
         return run_automatic("/data", self.settings, channels, [1], [self.catalog], assign or self.assign)
 
+    def test_multiple_cleanup_rules_and_empty_table_disables_legacy_prefix(self):
+        self.settings["automatic_prefix"] = "OLD "
+        self.settings["automatic_name_cleanup"] = [{"mode": "starts_with", "text": "US "},
+                                                   {"mode": "regex", "text": r"^CA\s+"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "US ABC"},
+                                 {"id": 2, "group_id": 1, "name": "CA News"}])
+        self.assertEqual(result["applied"], 2)
+        self.settings["automatic_name_cleanup"] = []
+        result = self.run_match([{"id": 3, "group_id": 1, "name": "OLD ABC"}])
+        self.assertEqual(result["channels"][0]["reason"], "no_match")
+
+    def test_invalid_cleanup_table_blocks_matching(self):
+        self.settings["automatic_name_cleanup"] = [{"mode": "regex", "text": "["}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertTrue(result["configuration_errors"])
+        self.assertFalse(self.calls)
+
+    def test_cleanup_suffix_is_applied_to_segment_matching_after_hint(self):
+        self.settings["automatic_name_cleanup"] = [{"mode": "ends_with", "text": " FHD"}]
+        self.settings["automatic_channel_hints"] = [{"mode": "contains", "text": "FHD", "path_mode": "contains", "path_text": "united"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "US | News FHD"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(self.calls[0][5], "tv_logos:countries/united-states/news-us.png")
+
     def test_hints_prefer_union_and_fall_back_with_original_name(self):
         self.catalog.options = lambda _: ["countries/canada/news-ca.png", "countries/united-states/news-us.png"]
         self.settings["automatic_groups"][0]["scope"] = "."

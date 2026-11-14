@@ -7,6 +7,7 @@ from . import catalogs
 from .channel_patterns import compile_patterns
 from .filters import MATCH_TYPES, catalog_filter_rules, matches
 from .mappings import automatic_ignored_channels
+from .name_cleanup import cleanup_rows, compile_cleanup
 from .scheduling import parse_schedule
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,8 @@ def make_fields(data_dir, settings, channels, groups=()):
     rules, filter_errors = catalog_filter_rules(settings.get("catalog_filters", []), catalogs.CATALOGS)
     _, hint_errors = compile_patterns(settings.get("automatic_channel_hints", []), hints=True)
     _, ignore_errors = compile_patterns(settings.get("automatic_ignore_patterns", []))
+    cleanup_defaults = cleanup_rows(settings)
+    _, cleanup_errors = compile_cleanup(cleanup_defaults)
     logo_options = []
     all_logos = {}
     directories = set()
@@ -167,7 +170,7 @@ def make_fields(data_dir, settings, channels, groups=()):
         {"id": "automatic_ignore_pattern_help", "type": "info", "section": "automatic_advanced",
          "description": "Channel patterns to ignore: Match the original channel name to exclude channels from Auto Match. Manual Match can still assign them. Channel patterns support contains, starts with and regex, with optional case sensitivity. Avoid regex patterns with excessive backtracking."},
         {"id": "automatic_name_prefix_help", "type": "info", "section": "automatic_advanced",
-         "description": "Name prefixes: Hints and ignore patterns do not remove prefixes. Use Name prefix to remove if the prefix should also be removed before matching a logo."},
+         "description": "Channel name cleanup: Remove a prefix, suffix or regex match before matching a logo. The first matching row removes one occurrence. Hints and ignore patterns still use the original name. Cleanup is case-insensitive."},
         *([{"id": "automatic_pattern_errors", "type": "info", "section": "automatic_advanced",
             "label": "Pattern errors", "description": " ".join([f"Hint: {error}" for error in hint_errors] + [f"Ignore: {error}" for error in ignore_errors]) + " Auto Match will not run until these are corrected."}] if hint_errors or ignore_errors else []),
         *[{"id": field_id, "type": "table", "section": "automatic_advanced", "label": label, "default": [],
@@ -181,13 +184,16 @@ def make_fields(data_dir, settings, channels, groups=()):
                   {"id": "path_text", "label": "Path pattern", "type": "string"}] if hint else []),
            ]} for field_id, label, hint in (("automatic_channel_hints", "Channel catalog hints", True),
                                            ("automatic_ignore_patterns", "Channel patterns to ignore", False))],
-        {"id": "automatic_prefix", "type": "string", "section": "automatic_advanced",
-         "label": "Name prefix to remove", "default": "",
-         "description": "Optional prefix removed from the start of channel names."},
-        {"id": "automatic_prefix_mode", "type": "select", "section": "automatic_advanced",
-         "label": "Prefix mode", "default": "literal", "options": [
-             {"value": "literal", "label": "Literal"}, {"value": "regex", "label": "Regex"}],
-         "description": "Regex is matched at the start of the name. Avoid patterns with excessive backtracking."},
+        *([{"id": "automatic_cleanup_errors", "type": "info", "section": "automatic_advanced",
+            "label": "Cleanup errors", "description": " ".join(cleanup_errors) + " Auto Match will not run until these are corrected."}] if cleanup_errors else []),
+        {"id": "automatic_name_cleanup", "type": "table", "section": "automatic_advanced",
+         "label": "Channel name cleanup", "default": cleanup_defaults if isinstance(cleanup_defaults, list) else [],
+         "columns": [
+             {"id": "mode", "label": "Mode", "type": "select", "options": [
+                 {"value": "starts_with", "label": "Starts with"}, {"value": "ends_with", "label": "Ends with"},
+                 {"value": "regex", "label": "Regex"}]},
+             {"id": "text", "label": "Text or pattern", "type": "string"},
+         ]},
         *([{"id": "automatic_prefix_rules", "type": "table", "section": "automatic_advanced",
          "label": "Group-specific name prefixes", "default": [], "columns": [
              {"id": "group", "label": "Channel group", "type": "select", "options": group_options},
@@ -195,7 +201,7 @@ def make_fields(data_dir, settings, channels, groups=()):
                  {"value": "literal", "label": "Literal"}, {"value": "regex", "label": "Regex"}]},
              {"id": "prefix", "label": "Prefix", "type": "string"},
          ]}, {"id": "automatic_prefix_help", "type": "info", "section": "automatic_advanced",
-         "description": "Previously saved group prefix rules still override the shared prefix. Remove all rows to use the shared prefix for every group."}] if settings.get("automatic_prefix_rules") else []),
+          "description": "Previously saved group prefix rules still override channel name cleanup. Remove all rows to use cleanup for every group."}] if settings.get("automatic_prefix_rules") else []),
         {"id": "automatic_threshold", "type": "number", "section": "automatic_advanced",
          "label": "Fuzzy threshold (%)", "default": 90,
          "description": "Used by all Standard + fuzzy groups. Scores must be strictly above this value; 100 cannot match."},
