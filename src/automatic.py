@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 import re
 
 from .mappings import automatic_ignored_channels
+from .name_cleanup import cleanup_rows, compile_cleanup
 
 
 def configuration_snapshot(settings, group_options, channels=()):
@@ -61,6 +62,8 @@ def configuration_snapshot(settings, group_options, channels=()):
             "prefix": scalar(settings.get("automatic_prefix", "")),
             "prefix_mode": scalar(settings.get("automatic_prefix_mode", "literal")),
             "prefix_rules": rules,
+            "name_cleanup": pattern_snapshot("automatic_name_cleanup", ("mode", "text")) if "automatic_name_cleanup" in settings else [
+                {"mode": scalar(row.get("mode")), "text": scalar(row.get("text"))} for row in cleanup_rows(settings)],
             "fuzzy_threshold": scalar(settings.get("automatic_threshold", 90)),
             "variant_preference": scalar(settings.get("automatic_variant", "standard")),
             "generic_network_fallback": scalar(settings.get("automatic_generic_fallback", True)),
@@ -81,6 +84,9 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
     if not isinstance(rows, list):
         return {}, ["Group settings must be a list"]
     settings = settings if settings is not None else {}
+    cleanup, cleanup_errors = compile_cleanup(cleanup_rows(settings))
+    if cleanup_errors:
+        return {}, [f"Name cleanup: {error}" for error in cleanup_errors]
     catalog_ids = set(catalog_ids)
     prefix_rows = settings.get("automatic_prefix_rules", [])
     if not isinstance(prefix_rows, list):
@@ -123,10 +129,10 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
             if prefix_counts[group] > 1:
                 raise ValueError("Group has more than one prefix rule")
             rule = prefix_rules.get(group)
-            prefix = rule.get("prefix", "") if rule else settings.get("automatic_prefix", "")
+            prefix = rule.get("prefix", "") if rule else (settings.get("automatic_prefix", "") if "automatic_name_cleanup" not in settings else "")
             if not isinstance(prefix, str):
                 raise ValueError("Name prefix must be text")
-            prefix_mode = (rule.get("mode") or "literal") if rule else (settings.get("automatic_prefix_mode") or "literal")
+            prefix_mode = (rule.get("mode") or "literal") if rule else ((settings.get("automatic_prefix_mode") or "literal") if "automatic_name_cleanup" not in settings else "literal")
             if prefix_mode not in {"literal", "regex"}:
                 raise ValueError("Unknown prefix mode")
             if prefix_mode == "regex":
@@ -148,7 +154,8 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
                 raise ValueError("Fuzzy threshold must be between 0 and 100")
             compiled[group] = {"strategy": strategy, "catalog": catalog_id,
                                "scope": "" if str(path) == "." else str(path), "replace": bool(replace),
-                               "prefix": prefix, "prefix_mode": prefix_mode,
+                                "prefix": prefix, "prefix_mode": prefix_mode,
+                                "name_cleanup": deepcopy(cleanup) if not rule and "automatic_name_cleanup" in settings else [],
                                "variant": variant, "generic_fallback": generic, "guide_signals": guide,
                                "threshold": threshold,
                                "catalog_filters": deepcopy(settings.get("catalog_filters", [])),

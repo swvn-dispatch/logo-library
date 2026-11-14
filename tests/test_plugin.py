@@ -83,8 +83,8 @@ class PluginTests(unittest.TestCase):
             "automatic_strategy_help", "automatic_scope_help", "automatic_replace_help",
             "automatic_groups", "automatic_generic_fallback", "automatic_ignored_channels", "automatic_advanced",
             "automatic_advanced_help", "automatic_pattern_help", "automatic_ignore_pattern_help", "automatic_name_prefix_help",
-            "automatic_channel_hints", "automatic_ignore_patterns", "automatic_prefix",
-            "automatic_prefix_mode", "automatic_threshold", "automatic_variant",
+            "automatic_channel_hints", "automatic_ignore_patterns", "automatic_name_cleanup",
+            "automatic_threshold", "automatic_variant",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
             "scheduled_tasks", "scheduled_tasks_help", "schedule_automatic_mode", "schedule_automatic_value",
@@ -118,6 +118,8 @@ class PluginTests(unittest.TestCase):
             self.assertEqual(by_id[field_id]["default"], [])
         self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic assignment - Advanced")
         self.assertNotIn("automatic_prefix_rules", by_id)
+        self.assertEqual(by_id["automatic_name_cleanup"]["section"], "automatic_advanced")
+        self.assertEqual(by_id["automatic_name_cleanup"]["default"], [])
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
                          ["group", "strategy", "scope", "replace"])
         self.assertEqual(by_id["automatic_groups"]["columns"][0]["label"], "Group")
@@ -172,6 +174,19 @@ class PluginTests(unittest.TestCase):
         by_id = {field["id"]: field for field in fields}
         self.assertEqual(by_id["automatic_prefix_rules"]["section"], "automatic_advanced")
         self.assertIn("Remove all rows", by_id["automatic_prefix_help"]["description"])
+
+    def test_cleanup_table_defaults_to_legacy_settings(self):
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, {"automatic_prefix": "CA |", "automatic_prefix_mode": "regex"}, [], [])
+        table = next(field for field in fields if field["id"] == "automatic_name_cleanup")
+        self.assertEqual(table["default"], [{"mode": "regex", "text": "^(?:CA |)"}])
+        self.assertEqual([column["id"] for column in table["columns"]], ["mode", "text"])
+
+    def test_invalid_cleanup_table_is_visible(self):
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, {"automatic_name_cleanup": [{"mode": "regex", "text": "["}]}, [], [])
+        error = next(field for field in fields if field["id"] == "automatic_cleanup_errors")
+        self.assertIn("Row 1", error["description"])
 
     def test_saved_station_strategy_remains_selectable(self):
         with tempfile.TemporaryDirectory() as root:
@@ -475,6 +490,7 @@ class PluginTests(unittest.TestCase):
         self.assertIsNone(groups[1]["group_name"])
         advanced = result["configuration"]["advanced"]
         self.assertEqual(advanced["prefix_rules"], [{"group": "1", "mode": "regex", "prefix": "^CA"}])
+        self.assertEqual(advanced["name_cleanup"], [{"mode": "starts_with", "text": "CA |"}])
         self.assertEqual(advanced["fuzzy_threshold"], 90)
         self.assertTrue(advanced["guide_id_signals"])
         self.assertEqual(advanced["channel_hints"], settings["automatic_channel_hints"])

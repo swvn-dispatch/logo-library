@@ -99,6 +99,16 @@ class AutomaticGroupTests(unittest.TestCase):
         self.assertNotIn("1", groups)
         self.assertIn("Invalid prefix regex", errors[0])
 
+    def test_group_prefix_overrides_ordered_cleanup_table(self):
+        rows = [{"group": "1", "strategy": "exact"}, {"group": "2", "strategy": "exact"}]
+        settings = {"automatic_name_cleanup": [{"mode": "starts_with", "text": "CA"}, {"mode": "regex", "text": "^US"}],
+                    "automatic_prefix_rules": [{"group": "1", "mode": "literal", "prefix": "GROUP"}]}
+        groups, errors = compile_groups(rows, [1, 2], {"tv"}, settings)
+        self.assertEqual(errors, [])
+        self.assertEqual(groups["1"]["prefix"], "GROUP")
+        self.assertEqual(groups["1"]["name_cleanup"], [])
+        self.assertEqual(groups["2"]["name_cleanup"], settings["automatic_name_cleanup"])
+
     def test_legacy_shared_groups_are_not_enabled_implicitly(self):
         settings = {"automatic_default_groups": ["1", "2", "3", "4"],
                     "automatic_default_scope": "countries/canada", "automatic_default_replace": True}

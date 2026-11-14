@@ -67,8 +67,11 @@ in newly generated reports; existing reports remain readable by the Ignore actio
 ### Advanced settings
 
 The collapsed **Automatic assignment - Advanced** section includes options for
-name prefixes, fuzzy threshold and logo variants. Prefixes can be literal or
-Python regex. Avoid regex patterns with excessive backtracking, which can stall
+channel name cleanup, fuzzy threshold and logo variants. Add cleanup rules to
+remove text at the start or end of a name, or a Python regex match anywhere.
+The first matching rule removes one occurrence before matching. Existing
+group-specific prefix rules still override the shared table. Avoid
+regex patterns with excessive backtracking, which can stall
 the matching task. The fuzzy threshold defaults to 90 percent; a match must
 score above it. Similarity is not a probability that a logo is correct.
 
@@ -80,7 +83,7 @@ tries the combined preferred paths first, then falls back to the normal pool
 if no usable match is found, including ambiguous or low-scoring matches. The
 fallback can therefore select a logo outside the hinted paths. Group scopes
 and global catalog filters always apply. Hints do not remove name prefixes; use
-the separate prefix setting if needed.
+the separate channel name cleanup setting if needed.
 
 **Channel patterns to ignore** uses the same channel matching modes and optional
 case sensitivity. A matching channel is ignored by Auto Match, including when

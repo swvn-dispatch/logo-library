@@ -9,6 +9,7 @@ from .catalog_scope import scoped_paths
 from .callsign_matching import match_callsign
 from .fuzzy_matching import match_fuzzy
 from .name_matching import _filename_name, match_name, normalize_name
+from .name_cleanup import clean_channel_name
 from .variants import select_variant
 from .candidates import candidate_details
 
@@ -72,6 +73,8 @@ def match_channel(name, config, name_index, callsign_index, catalog_id, network_
     provider format. Two-letter region-like components and trailing station
     tokens are not treated as network names. Conflicting candidates are skipped.
     """
+    if config.get("name_cleanup"):
+        name = clean_channel_name(name, config["name_cleanup"])
     prefix, mode, variant = config["prefix"], config["prefix_mode"], config["variant"]
     evidence = []
     full = match_name(name, name_index, prefix, mode, variant, catalog_id)

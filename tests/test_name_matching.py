@@ -4,6 +4,19 @@ from src.name_matching import build_name_index, match_name, normalize_name
 
 
 class NameMatchingTests(unittest.TestCase):
+    def test_first_matching_cleanup_rule_wins(self):
+        from src.name_cleanup import clean_channel_name
+        rows = [{"mode": "starts_with", "text": "CA"}, {"mode": "regex", "text": r"^CA\s+NEWS"}]
+        self.assertEqual(clean_channel_name("ca News", rows), " News")
+        self.assertEqual(clean_channel_name("US News", rows), "US News")
+        self.assertEqual(clean_channel_name("News FHD", [{"mode": "ends_with", "text": "FHD"}]), "News ")
+        self.assertEqual(clean_channel_name("News HD Plus HD", [{"mode": "regex", "text": "HD"}]), "News  Plus HD")
+
+    def test_legacy_regex_migration_remains_anchored(self):
+        from src.name_cleanup import cleanup_rows, clean_channel_name
+        rules = cleanup_rows({"automatic_prefix": r"(?i)CA\s*\|\s*", "automatic_prefix_mode": "regex"})
+        self.assertEqual(clean_channel_name("CA | News", rules), "News")
+        self.assertEqual(clean_channel_name("Other CA | News", rules), "Other CA | News")
     def test_unicode_punctuation_prefix_and_ampersand(self):
         index = build_name_index(["countries/united-states/café-and-news-us.png"], "tv_logos")
         self.assertEqual(match_name("US: Cafe\u0301 & News", index, "us:")["path"],
