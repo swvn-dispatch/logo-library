@@ -81,9 +81,10 @@ class PluginTests(unittest.TestCase):
             "instructions", "manual_assignment", "manual_instructions", "mappings",
             "automatic_assignment", "automatic_setup_help", "automatic_group_help",
             "automatic_strategy_help", "automatic_scope_help", "automatic_replace_help",
-            "automatic_groups", "automatic_ignored_channels", "automatic_advanced", "automatic_pattern_help",
+            "automatic_groups", "automatic_generic_fallback", "automatic_ignored_channels", "automatic_advanced",
+            "automatic_advanced_help", "automatic_pattern_help", "automatic_ignore_pattern_help", "automatic_name_prefix_help",
             "automatic_channel_hints", "automatic_ignore_patterns", "automatic_prefix",
-            "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
+            "automatic_prefix_mode", "automatic_threshold", "automatic_variant",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
             "scheduled_tasks", "scheduled_tasks_help", "schedule_automatic_mode", "schedule_automatic_value",
@@ -107,6 +108,11 @@ class PluginTests(unittest.TestCase):
         self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_replace_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
+        for field_id in ("automatic_advanced_help", "automatic_pattern_help", "automatic_ignore_pattern_help", "automatic_name_prefix_help"):
+            self.assertEqual(by_id[field_id]["section"], "automatic_advanced")
+        self.assertIn("CA |", by_id["automatic_pattern_help"]["description"])
+        self.assertIn("normal scope", by_id["automatic_pattern_help"]["description"])
+        self.assertIn("Manual Match", by_id["automatic_ignore_pattern_help"]["description"])
         for field_id in ("automatic_channel_hints", "automatic_ignore_patterns"):
             self.assertEqual(by_id[field_id]["section"], "automatic_advanced")
             self.assertEqual(by_id[field_id]["default"], [])
@@ -124,6 +130,7 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["automatic_variant"]["default"], "standard")
         self.assertIn({"value": "hd", "label": "Prefer HD variant"}, by_id["automatic_variant"]["options"])
         self.assertTrue(by_id["automatic_generic_fallback"]["default"])
+        self.assertEqual(by_id["automatic_generic_fallback"]["section"], "automatic_assignment")
         self.assertFalse(by_id["automatic_guide_signals"]["default"])
         self.assertEqual(by_id["automatic_guide_signals"]["label"], "Use channel TVG ID as a station hint")
         self.assertIn("not its matched EPG entry", by_id["automatic_guide_signals"]["description"])
