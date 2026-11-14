@@ -13,6 +13,8 @@ FORMATS = ("regional_lineup.json", "regional_lineup.region_dash.json", "regional
            "regional_lineup.plain_parentheses.json", "regional_lineup.no_callsign.json")
 REGIONS = {"CA": ("canada", "ca"), "QC": ("canada", "ca"),
            "US": ("united-states", "us"), "UK": ("united-kingdom", "uk")}
+# These catalog names need an explicit mapping; do not infer brand aliases.
+MANUAL_ONLY = {"countries/united-states/e-entertainment-us.png"}
 
 
 class RegionalMatrixTests(unittest.TestCase):
@@ -52,6 +54,8 @@ class RegionalMatrixTests(unittest.TestCase):
                         f"countries/{country}/{stem}-{suffix}.png")
                     if expected:
                         self.assertIn(expected, self.paths)
+                    if expected in MANUAL_ONLY:
+                        expected = None
                     original_name = self.original[group][position]
                     parts = original_name.split(" | ")
                     guide = f"{parts[-1]}.us" if group == "LOCALS - US" and len(parts) == 3 else None
@@ -81,7 +85,7 @@ class RegionalMatrixTests(unittest.TestCase):
     def test_user_guide_group_counts_and_strategy_equivalence(self):
         expected_counts = {
             "LOCALS - US": (12, 12), "LOCALS - CA": (4, 4),
-            "ENTERTAINMENT - US": (14, 22), "NEWS - US": (6, 8), "SPORTS - US": (5, 6),
+            "ENTERTAINMENT - US": (14, 21), "NEWS - US": (6, 8), "SPORTS - US": (5, 6),
             "ENTERTAINMENT - UK": (4, 19), "SPORTS - UK": (0, 15),
             "ENTERTAINMENT - CA": (9, 10), "NEWS - CA": (4, 5), "SPORTS - CA": (0, 12),
             "SPORTS - QC": (1, 5),

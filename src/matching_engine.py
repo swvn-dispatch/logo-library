@@ -8,10 +8,11 @@ from collections import defaultdict
 from .catalog_scope import scoped_paths
 from .callsign_matching import match_callsign
 from .fuzzy_matching import match_fuzzy
-from .name_matching import _filename_name, match_name, normalize_name
+from .name_matching import match_name, normalize_name
 from .name_cleanup import clean_channel_name
 from .variants import select_variant
 from .candidates import candidate_details
+from .catalogs.matching import matching_adapter
 
 _STATION_TOKEN = r"(?:[KW][A-Z]{2,3}|C[A-Z]{3})"
 
@@ -22,16 +23,13 @@ def _tokens(value):
 
 
 def build_network_index(paths, catalog_id, scope=""):
-    """Index generic TV Logos network names, never station-specific folders."""
+    """Index provider-recognized generic network names within the scope."""
     index = defaultdict(list)
+    adapter = matching_adapter(catalog_id)
     for value, path in scoped_paths(paths, scope):
-        if (catalog_id != "tv_logos" or len(path.parts) < 3 or path.parts[0] != "countries"
-                or path.parts[1] not in {"canada", "united-states", "united-kingdom"}):
+        if not adapter.is_generic_network(path):
             continue
-        parent = path.parts[2:-1]
-        if parent not in ((), ("hd",)):
-            continue
-        tokens = _tokens(_filename_name(path, catalog_id))
+        tokens = _tokens(adapter.filename_name(path))
         if tokens:
             index[tokens[0]].append((tokens, value))
     return index

@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 
+from .matching import TvLogosMatching
 from .catalog import (
     catalog_lock, current_catalog, ensure_index, read_index, release_initialization,
     reserve_initialization, resolve_logo, update_catalog,
@@ -12,6 +13,7 @@ class TvLogosCatalog:
     id = "tv_logos"
     label = "TV Logos"
     accepts_legacy_paths = True
+    matching = TvLogosMatching()
     actions = [{
         "id": "update_catalog",
         "label": "Refresh tv-logos downloaded catalog",
