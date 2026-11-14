@@ -33,6 +33,65 @@ class AutomaticRunTests(unittest.TestCase):
     def run_match(self, channels, assign=None):
         return run_automatic("/data", self.settings, channels, [1], [self.catalog], assign or self.assign)
 
+    def test_hints_prefer_union_and_fall_back_with_original_name(self):
+        self.catalog.options = lambda _: ["countries/canada/news-ca.png", "countries/united-states/news-us.png"]
+        self.settings["automatic_groups"][0]["scope"] = "."
+        self.settings["automatic_prefix"] = "CA | "
+        self.settings["automatic_channel_hints"] = [
+            {"mode": "starts_with", "text": "CA |", "path_mode": "contains", "path_text": "canada"},
+            {"mode": "contains", "text": "news", "path_mode": "contains", "path_text": "missing"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "CA | News"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(self.calls[0][5], "tv_logos:countries/canada/news-ca.png")
+        self.settings["catalog_filters"] = [{"mode": "exclude_contains", "text": "canada"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "CA | News"}])
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(self.calls[-1][5], "tv_logos:countries/united-states/news-us.png")
+
+    def test_ambiguous_hint_falls_back_to_normal_pool(self):
+        from unittest.mock import patch
+        self.settings["automatic_channel_hints"] = [{"mode": "contains", "text": "ABC", "path_mode": "contains", "path_text": "united"}]
+        with patch("src.automatic_run.match_channel", side_effect=[{"reason": "ambiguous", "method": "name"},
+                {"reason": None, "method": "name", "path": "countries/united-states/abc-us.png"}]) as match:
+            result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(match.call_count, 2)
+        self.assertEqual(result["applied"], 1)
+
+    def test_matching_hint_rows_form_union_and_use_cached_indexes(self):
+        from unittest.mock import patch
+        import src.automatic_run as runner
+        self.catalog.options = lambda _: ["countries/canada/news-ca.png", "countries/united-states/abc-us.png"]
+        self.settings["automatic_groups"][0]["scope"] = "."
+        self.settings["automatic_channel_hints"] = [
+            {"mode": "contains", "text": "C", "path_mode": "contains", "path_text": "canada"},
+            {"mode": "contains", "text": "C", "path_mode": "contains", "path_text": "united-states"}]
+        with patch.object(runner, "build_name_index", wraps=runner.build_name_index) as build:
+            result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"},
+                                     {"id": 2, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(result["applied"], 2)
+        self.assertEqual(build.call_count, 1)
+        self.assertEqual(len(build.call_args.args[0]), 2)
+
+    def test_below_threshold_hint_retries_and_reports_final_result(self):
+        from unittest.mock import patch
+        self.settings["automatic_channel_hints"] = [{"mode": "contains", "text": "ABC", "path_mode": "contains", "path_text": "united"}]
+        with patch("src.automatic_run.match_channel", side_effect=[{"reason": "below_threshold", "method": "fuzzy"},
+                {"reason": "no_match", "method": "none"}]) as match:
+            result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(match.call_count, 2)
+        self.assertEqual(result["channels"][0]["reason"], "no_match")
+
+    def test_ignore_patterns_override_manual_and_invalid_rules_stop_matching(self):
+        self.settings["mappings"] = [{"channel": "1", "logo": "tv_logos:a.png"}]
+        self.settings["automatic_ignore_patterns"] = [{"mode": "regex", "text": "^abc$"}]
+        result = self.run_match([{"id": 1, "group_id": 1, "name": "ABC"}])
+        self.assertEqual(result["ignored"], 1)
+        self.assertEqual(self.calls, [])
+        self.settings["automatic_ignore_patterns"] = [{"mode": "regex", "text": "["}]
+        result = self.run_match([{"id": 2, "group_id": 1, "name": "ABC"}])
+        self.assertTrue(result["configuration_errors"])
+        self.assertEqual(self.calls, [])
+
     def test_report_candidates_respect_scope_and_include_similarity(self):
         self.catalog.options = lambda _: ["countries/united-states/news-us.png", "countries/canada/newsy-ca.png"]
         self.settings["automatic_groups"][0]["strategy"] = "fuzzy"

@@ -68,6 +68,21 @@ Python regex. Avoid regex patterns with excessive backtracking, which can stall
 the matching task. The fuzzy threshold defaults to 90 percent; a match must
 score above it. Similarity is not a probability that a logo is correct.
 
+**Channel catalog hints** match the original channel name using contains, starts
+with, or regex, optionally case-sensitive. Each matching row contributes a
+case-insensitive include rule for the full catalog-relative path. For example,
+a channel starting with `CA |` can prefer paths containing `canada`. Auto Match
+tries the combined preferred paths first, then falls back to the normal pool
+if no usable match is found, including ambiguous or low-scoring matches. The
+fallback can therefore select a logo outside the hinted paths. Group scopes
+and global catalog filters always apply. Hints do not remove name prefixes; use
+the separate prefix setting if needed.
+
+**Channel patterns to ignore** uses the same channel matching modes and optional
+case sensitivity. A matching channel is ignored by Auto Match, including when
+it has a manual mapping. Explicit Manual Match remains available. Invalid
+pattern rules stop Auto Match until corrected.
+
 Logo variant preference defaults to Prefer standard and can instead prefer an HD
 logo within a recognized variant family. Prefer HD chooses the HD logo with the
 fewest additional recognized variant attributes, or a standard logo when no HD
@@ -87,6 +102,14 @@ An explicit mapping replaces the channel's existing logo. Duplicate rows,
 missing channels and unavailable logo files are skipped; other valid mappings
 can still be applied. Removing a mapping does not remove or restore its assigned
 logo.
+
+The Manual Match result includes the saved manual mapping definitions used for
+the run. The Auto Match result instead includes its group settings, ignored
+channels, catalog filters and advanced settings, including channel hints and
+ignore patterns.
+All action results include the plugin and Dispatcharr versions. Development
+versions include the Dispatcharr build timestamp when available; an unavailable
+Dispatcharr version is reported as `unknown`.
 
 Selected images are copied into Dispatcharr's local logo directory. Assigned
 logos remain available if the plugin is disabled or the catalog is unreachable.

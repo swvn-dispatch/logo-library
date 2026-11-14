@@ -4,6 +4,7 @@ import logging
 from pathlib import PurePosixPath
 
 from . import catalogs
+from .channel_patterns import compile_patterns
 from .filters import MATCH_TYPES, catalog_filter_rules, matches
 from .mappings import automatic_ignored_channels
 from .scheduling import parse_schedule
@@ -23,6 +24,8 @@ def _valid_text(value):
 
 def make_fields(data_dir, settings, channels, groups=()):
     rules, filter_errors = catalog_filter_rules(settings.get("catalog_filters", []), catalogs.CATALOGS)
+    _, hint_errors = compile_patterns(settings.get("automatic_channel_hints", []), hints=True)
+    _, ignore_errors = compile_patterns(settings.get("automatic_ignore_patterns", []))
     logo_options = []
     all_logos = {}
     directories = set()
@@ -152,6 +155,21 @@ def make_fields(data_dir, settings, channels, groups=()):
          "label": "Channels to ignore", "default": ignored_ids, "options": ignore_options,
          "description": "Auto Match will leave these channels unchanged. Manual Match can still apply an explicit manual mapping."},
         {"id": "automatic_advanced", "type": "section", "label": "Automatic assignment - Advanced", "collapsed": True},
+        {"id": "automatic_pattern_help", "type": "info", "section": "automatic_advanced",
+         "description": "Patterns match the original channel name before prefix removal. Hints first search paths matching any applicable include, then fall back to the normal scope if no match is found. Ignore patterns affect Auto Match only. Avoid regex patterns with excessive backtracking."},
+        *([{"id": "automatic_pattern_errors", "type": "info", "section": "automatic_advanced",
+            "label": "Pattern errors", "description": " ".join([f"Hint: {error}" for error in hint_errors] + [f"Ignore: {error}" for error in ignore_errors]) + " Auto Match will not run until these are corrected."}] if hint_errors or ignore_errors else []),
+        *[{"id": field_id, "type": "table", "section": "automatic_advanced", "label": label, "default": [],
+           "columns": [
+               {"id": "mode", "label": "Channel match", "type": "select", "options": [
+                   {"value": mode, "label": mode.replace("_", " ").title()} for mode in ("contains", "starts_with", "regex")]},
+               {"id": "text", "label": "Channel pattern", "type": "string"},
+               {"id": "case_sensitive", "label": "Case sensitive", "type": "boolean"},
+               *([{"id": "path_mode", "label": "Path include", "type": "select", "options": [
+                   {"value": mode, "label": mode.replace("_", " ").title()} for mode in MATCH_TYPES]},
+                  {"id": "path_text", "label": "Path pattern", "type": "string"}] if hint else []),
+           ]} for field_id, label, hint in (("automatic_channel_hints", "Channel catalog hints", True),
+                                           ("automatic_ignore_patterns", "Channel patterns to ignore", False))],
         {"id": "automatic_prefix", "type": "string", "section": "automatic_advanced",
          "label": "Name prefix to remove", "default": "",
          "description": "Optional prefix removed from the start of channel names."},

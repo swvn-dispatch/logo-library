@@ -5,12 +5,12 @@ import logging
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from .dispatcharr import (assign_logo, automatic_channels, channel_options,
+from .dispatcharr import (assign_logo, automatic_channels, channel_options, dispatcharr_version,
                           group_options, guarded_assign_logo, ignore_latest_skipped, store_skipped_ids)
 from .automatic_run import run_automatic
 from .automatic import configuration_snapshot
 from .fields import make_fields
-from .mappings import apply_mappings
+from .mappings import apply_mappings, manual_configuration_snapshot
 from . import catalogs
 from .scheduling import action_lock, run_service
 
@@ -51,9 +51,12 @@ class Plugin:
         if action in {"run_automatic", "update_catalog"} and context.get("data_dir"):
             with action_lock(context["data_dir"], action) as acquired:
                 if not acquired:
-                    return {"status": "error", "message": "This task is already running."}
-                return self._run(action, params, context)
-        return self._run(action, params, context)
+                    result = {"status": "error", "message": "This task is already running."}
+                else:
+                    result = self._run(action, params, context)
+        else:
+            result = self._run(action, params, context)
+        return {**result, "plugin_version": self.version, "dispatcharr_version": dispatcharr_version()}
 
     def _run(self, action, params, context):
         def assign(channel, identity, image):
@@ -92,21 +95,16 @@ class Plugin:
             result["channel_numbers"] = True
             if reference:
                 result["ignored_channel_reference"] = reference
-            return {"status": status, "message": message, "plugin_version": self.version,
+            return {"status": status, "message": message,
                     "configuration": configuration, **result}
         if action == "apply_changes":
             settings = context.get("settings", {})
-            try:
-                options = group_options()
-            except Exception:
-                logger.warning("Could not retrieve group labels for Manual Match results", exc_info=True)
-                options = []
             try:
                 channels = automatic_channels()
             except Exception:
                 logger.warning("Could not retrieve channel numbers for Manual Match results", exc_info=True)
                 channels = []
-            configuration = configuration_snapshot(settings, options, channels)
+            configuration = manual_configuration_snapshot(settings.get("mappings", []), channels)
             result = apply_mappings(context["data_dir"], settings.get("mappings", []), assign)
             status = "partial" if result["skipped"] else "ok"
             channel_by_id = {str(channel["id"]): channel for channel in channels}
@@ -115,7 +113,7 @@ class Plugin:
                 error["channel"] = channel.get("number")
                 error["name"] = channel.get("name")
             message = f"Applied {result['applied']}, ignored {result.get('ignored', 0)}, skipped {result['skipped']}."
-            return {"status": status, "message": message, "plugin_version": self.version,
+            return {"status": status, "message": message,
                     "configuration": configuration, **result}
         result = catalogs.run_action(action, params, context)
         return result if result is not None else {"status": "error", "message": f"Unknown action: {action}"}

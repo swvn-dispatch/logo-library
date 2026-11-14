@@ -6,10 +6,27 @@ import types
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.dispatcharr import assign_logo, automatic_channels, channel_options, group_options, guarded_assign_logo, ignore_latest_skipped
+from src.dispatcharr import assign_logo, automatic_channels, channel_options, dispatcharr_version, group_options, guarded_assign_logo, ignore_latest_skipped
 
 
 class DispatcharrTests(unittest.TestCase):
+    def test_dispatcharr_version_includes_dev_timestamp(self):
+        version = types.ModuleType("version")
+        version.__version__ = "0.33.0"
+        version.__timestamp__ = "20261114162620"
+        with patch.dict(sys.modules, {"version": version}):
+            self.assertEqual(dispatcharr_version(), "v0.33.0-20261114162620")
+            version.__version__ = "v0.33.0"
+            self.assertEqual(dispatcharr_version(), "v0.33.0-20261114162620")
+            version.__timestamp__ = None
+            self.assertEqual(dispatcharr_version(), "v0.33.0")
+
+    def test_dispatcharr_version_file_fallback_and_unknown(self):
+        with patch.dict(sys.modules, {"version": None}), patch("src.dispatcharr.Path.read_text", return_value="__version__ = '0.33.0'\n__timestamp__ = '20261114162620'\n"):
+            self.assertEqual(dispatcharr_version(), "v0.33.0-20261114162620")
+        with patch.dict(sys.modules, {"version": None}), patch("src.dispatcharr.Path.read_text", side_effect=OSError):
+            self.assertEqual(dispatcharr_version(), "unknown")
+
     def test_ignore_latest_skipped_merges_and_handles_missing_history(self):
         plugin = MagicMock(settings={"mappings": [{"channel": "1", "ignore": True}]})
         model = MagicMock()
@@ -67,7 +84,8 @@ class DispatcharrTests(unittest.TestCase):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
         expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
                     "prefix": "", "prefix_mode": "literal", "variant": "standard", "generic_fallback": True,
-                    "guide_signals": False, "threshold": 90, "catalog_filters": []}
+                    "guide_signals": False, "threshold": 90, "catalog_filters": [],
+                    "channel_hints": [], "ignore_patterns": []}
         plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
         plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
         channel = types.SimpleNamespace(channel_group_id=8, name="Raw", logo_id=None)
@@ -125,6 +143,11 @@ class DispatcharrTests(unittest.TestCase):
             settings["catalog_filters"] = [{"mode": "exclude_contains", "text": "abc"}]
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("catalog_filters")
+            for key, rule in (("automatic_channel_hints", {"mode": "contains", "text": "Effective", "path_mode": "contains", "path_text": "canada"}),
+                              ("automatic_ignore_patterns", {"mode": "contains", "text": "Effective"})):
+                settings[key] = [rule]
+                self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+                settings.pop(key)
             settings["automatic_guide_signals"] = True
             override.tvg_id = "WABC.us"
             guide_args = ("/plugin", "1", "2", "Effective", "old.us", {**expected, "guide_signals": True},

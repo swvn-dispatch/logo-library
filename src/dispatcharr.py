@@ -1,5 +1,6 @@
 """Dispatcharr channel and logo integration."""
 
+import ast
 import hashlib
 import json
 import logging
@@ -11,6 +12,33 @@ import uuid
 
 LOGO_DIR = Path("/data/logos")
 logger = logging.getLogger(__name__)
+
+
+def dispatcharr_version():
+    """Read Dispatcharr's version and retain the timestamp on development builds."""
+    try:
+        import version
+        release = getattr(version, "__version__", None)
+        timestamp = getattr(version, "__timestamp__", None)
+    except Exception:
+        release, timestamp = None, None
+    if not isinstance(release, str) or not release.strip():
+        try:
+            tree = ast.parse(Path("/app/version.py").read_text(encoding="utf-8"))
+            values = {}
+            for node in tree.body:
+                if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                    if node.targets[0].id in {"__version__", "__timestamp__"}:
+                        values[node.targets[0].id] = ast.literal_eval(node.value)
+            release, timestamp = values.get("__version__"), values.get("__timestamp__")
+        except (OSError, SyntaxError, ValueError, TypeError):
+            return "unknown"
+    if not isinstance(release, str) or not release.strip():
+        return "unknown"
+    release = release.strip()
+    if isinstance(timestamp, str) and timestamp.strip():
+        return f"v{release.removeprefix('v')}-{timestamp.strip()}"
+    return release
 
 
 def assign_logo(channel_id, relative, image, logo_dir=LOGO_DIR):
@@ -178,6 +206,7 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
     from apps.plugins.models import PluginConfig
     from . import catalogs
     from .automatic import compile_groups
+    from .channel_patterns import channel_matches, compile_patterns
     from .mappings import automatic_ignored_channels, manual_disposition
 
     with transaction.atomic():
@@ -216,6 +245,11 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
 
         if str(effective("channel_group_id")) != group_id or effective("name") != name:
             return "channel_changed"
+        ignore_patterns, pattern_errors = compile_patterns(settings.get("automatic_ignore_patterns", []))
+        if pattern_errors:
+            return "settings_changed"
+        if any(channel_matches(name, rule) for rule in ignore_patterns):
+            return "ignored"
         if expected["guide_signals"] and effective("tvg_id") != guide_id:
             return "channel_changed"
         if effective("logo_id") is not None and not expected["replace"]:
