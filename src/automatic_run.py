@@ -96,12 +96,12 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
                         if selection is not None:
                             path_rules = [hints[i][3] for i in selection]
                             paths = [path for path in paths if matches(path, path_rules)]
-                        indices[key] = (build_name_index(paths, catalog.id, config["scope"]),
-                                        build_callsign_index(paths, catalog.id, config["scope"]),
-                                        build_network_index(paths, catalog.id, config["scope"]) if config["generic_fallback"] else None,
-                                        build_station_name_index(paths, catalog.id, config["scope"]))
+                        indices[key] = (build_name_index(paths, catalog, config["scope"]),
+                                        build_callsign_index(paths, catalog, config["scope"]),
+                                        build_network_index(paths, catalog, config["scope"]) if config["generic_fallback"] else None,
+                                        build_station_name_index(paths, catalog, config["scope"]))
                     name_index, callsign_index, network_index, station_name_index = indices[key]
-                    return match_channel(channel["name"], config, name_index, callsign_index, catalog.id, network_index,
+                    return match_channel(channel["name"], config, name_index, callsign_index, catalog, network_index,
                                          channel.get("guide_id"), station_name_index)
 
                 match = attempt(selected) if selected else None

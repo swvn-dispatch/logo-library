@@ -1,20 +1,7 @@
 """Choose preferred logos only within a verified variant family."""
 
 from pathlib import PurePosixPath
-
-
-def _family(path):
-    path = PurePosixPath(path)
-    parts = path.stem.casefold().split("-")
-    country = parts.pop() if parts and parts[-1] in {"us", "uk", "ca", "au", "nz"} else ""
-    variants = set()
-    while len(parts) > 1 and parts[-1] in {"hd", "hz", "horizontal"}:
-        variants.add(parts.pop())
-    parents = list(path.parts[:-1])
-    if parents and parents[-1] == "hd":
-        variants.add("hd")
-        parents.pop()
-    return (tuple(parents), tuple(parts), country), variants
+from .catalogs.matching import matching_adapter
 
 
 def select_variant(paths, preference="strict", catalog_id=None):
@@ -22,9 +9,13 @@ def select_variant(paths, preference="strict", catalog_id=None):
     paths = set(paths)
     if len(paths) == 1:
         return next(iter(paths))
-    if preference not in {"standard", "hd"} or catalog_id != "tv_logos" or not paths:
+    if preference not in {"standard", "hd"} or not paths:
         return None
-    classified = [(path, *_family(path)) for path in paths]
+    adapter = matching_adapter(catalog_id)
+    classified = [(path, adapter.variant_family(PurePosixPath(path))) for path in paths]
+    if any(family is None for _, family in classified):
+        return None
+    classified = [(path, *family) for path, family in classified]
     if len({family for _, family, _ in classified}) != 1:
         return None
     if preference == "hd":

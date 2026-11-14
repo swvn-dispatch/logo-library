@@ -30,6 +30,11 @@ with **Standard**, which uses channel names and station information. **Standard
 + fuzzy** also considers similar names when stronger matches are unavailable.
 Review assignments, especially when using fuzzy matching.
 
+Channel names that differ from catalog filenames may need a manual mapping.
+Auto Match can match a name and number in either order and can infer an omitted
+1 when there is no exact unnumbered match. Other differences, such as
+E! for E Entertainment, may require a manual mapping.
+
 Choose a catalog folder to limit the search, including its subfolders. A country
 folder is a useful starting point unless a group spans multiple countries.
 Choose **Entire catalog** to search all available paths. Catalog filters still

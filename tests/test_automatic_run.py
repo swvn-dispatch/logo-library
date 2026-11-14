@@ -2,11 +2,13 @@ from contextlib import contextmanager
 import unittest
 
 from src.automatic_run import run_automatic
+from src.catalogs.tv_logos.matching import TvLogosMatching
 
 
 class Catalog:
     id = "tv_logos"
     accepts_legacy_paths = True
+    matching = TvLogosMatching()
 
     def __init__(self):
         self.reads = 0

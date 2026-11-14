@@ -44,6 +44,14 @@ class CallSignTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_callsign_index([], "other", "../us")
 
+    def test_local_layout_and_callsign_position_not_tied_to_country(self):
+        paths = ["countries/example/local/network-city-wabc-xx.png",
+                 "countries/example/region-local/nested/network-city-wabc-hz-xx.png",
+                 "countries/example/network-city-wabc-xx.png",
+                 "countries/example/local/wabc-network-xx.png"]
+        index = build_callsign_index(paths, "tv_logos")
+        self.assertEqual(set(index["WABC"]), set(paths[:2]))
+
 
 if __name__ == "__main__":
     unittest.main()

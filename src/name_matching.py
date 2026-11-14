@@ -7,22 +7,9 @@ import re
 from .catalog_scope import scoped_paths
 from .variants import select_variant
 from .candidates import candidate_details
+from .catalogs.matching import matching_adapter
 
-# TV Logos uses these country suffixes in the corresponding directories.
-# Do not strip an unrecognized suffix: it may be part of a network name.
-_COUNTRY_SUFFIXES = {
-    "united-states": "us", "united-kingdom": "uk", "canada": "ca",
-    "australia": "au", "new-zealand": "nz",
-}
-_VARIANTS = {"hd", "hz", "horizontal"}
 _GENERIC_SUFFIXES = ("television", "channel", "network")
-# Exact alternate branding for filenames in TV Logos. These are scoped to the
-# catalog's country directory, never applied to another catalog or country.
-_TV_LOGOS_ALIASES = {
-    ("united-kingdom", "4more"): ("more4",),
-    ("united-states", "eentertainment"): ("e",),
-    ("united-states", "cspan1"): ("cspan",),
-}
 
 
 def _without_generic_suffix(name):
@@ -53,21 +40,6 @@ def normalize_name(value, prefix="", prefix_mode="literal"):
     return "".join(char for char in value if char.isalnum())
 
 
-def _filename_name(path, catalog_id):
-    filename = path.stem
-    if catalog_id != "tv_logos":
-        return filename
-    parts = filename.split("-")
-    directories = path.parts
-    if len(directories) >= 3 and directories[0] == "countries":
-        suffix = _COUNTRY_SUFFIXES.get(directories[1].casefold())
-        if suffix and len(parts) > 1 and parts[-1].casefold() == suffix:
-            parts.pop()
-    while len(parts) > 1 and parts[-1].casefold() in _VARIANTS:
-        parts.pop()
-    return "-".join(parts)
-
-
 def build_name_index(paths, catalog_id, scope=""):
     """Index paths within one directory scope, preserving duplicate variants.
 
@@ -76,17 +48,29 @@ def build_name_index(paths, catalog_id, scope=""):
     """
     index = defaultdict(set)
     aliases = defaultdict(set)
+    adapter = matching_adapter(catalog_id)
     for value, path in scoped_paths(paths, scope):
-        name = normalize_name(_filename_name(path, catalog_id))
+        name = normalize_name(adapter.filename_name(path))
         if name:
             index[name].add(value)
             alias = _without_generic_suffix(name)
             if alias:
                 aliases[alias].add(value)
-            if catalog_id == "tv_logos" and len(path.parts) >= 3 and path.parts[0] == "countries":
-                for alternative in _TV_LOGOS_ALIASES.get((path.parts[1], name), ()):
-                    aliases[alternative].add(value)
-    # Explicit names take precedence over inferred descriptive suffix aliases.
+            for alternative in adapter.aliases(path, name):
+                aliases[alternative].add(value)
+    # The unnumbered name may refer to the first channel in a numbered family.
+    numbered = defaultdict(set)
+    for name in index:
+        match = re.fullmatch(r"([^\d]+)(\d+)", name)
+        if match:
+            numbered[match.group(1)].add(match.group(2))
+        leading = re.fullmatch(r"(\d+)([^\d]+)", name)
+        if leading and len(leading.group(2)) >= 3:
+            aliases[leading.group(2) + leading.group(1)].update(index[name])
+    for base, numbers in numbered.items():
+        if len(base) >= 3 and "1" in numbers:
+            aliases[base].update(index[base + "1"])
+    # Explicit names take precedence over inferred aliases.
     for key, values in aliases.items():
         if key not in index:
             index[key].update(values)

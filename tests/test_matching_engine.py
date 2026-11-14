@@ -131,3 +131,24 @@ class MatchingEngineTests(unittest.TestCase):
         for channel in ("CA | CTV Comedy", "CA | CTV Drama", "CA | CBC News"):
             with self.subTest(channel=channel):
                 self.assertIsNone(match_channel(channel, config, names, calls, "tv_logos", networks)["path"])
+
+    def test_generic_network_index_accepts_any_country_but_not_local_folders(self):
+        paths = ["countries/australia/seven-au.png", "countries/australia/hd/seven-hd-au.png",
+                 "countries/australia/local/seven-sydney-au.png", "countries/france/tf1.png",
+                 "countries/canada/ctv-ca.png", "networks/australia/seven.png"]
+        networks = build_network_index(paths, "tv_logos", "countries/australia")
+        self.assertEqual({path for entries in networks.values() for _, path in entries}, set(paths[:2]))
+        all_networks = build_network_index(paths, "tv_logos")
+        self.assertIn((("tf", "1"), paths[3]), all_networks["tf"])
+        self.assertNotIn(paths[2], {path for entries in all_networks.values() for _, path in entries})
+        self.assertFalse(build_network_index(paths, "other"))
+
+    def test_generic_fallback_uses_eligible_paths_outside_previous_countries(self):
+        paths = ["countries/australia/seven-au.png"]
+        names = build_name_index(paths, "tv_logos", "countries/australia")
+        networks = build_network_index(paths, "tv_logos", "countries/australia")
+        config = {**self.config, "generic_fallback": True}
+        result = match_channel("AU | Seven Sydney | WXYZ", config, names, {}, "tv_logos", networks)
+        self.assertEqual(result["path"], paths[0])
+        self.assertEqual(result["method"], "network_fallback")
+        self.assertIsNone(match_channel("AU | Seven Sydney", config, names, {}, "tv_logos", networks)["path"])
