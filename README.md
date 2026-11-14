@@ -40,6 +40,10 @@ to allow overwriting them for a group. Saved manual mappings take priority,
 including incomplete mappings with a channel selected. Channels outside enabled
 groups are omitted from results; configuration errors are reported.
 
+**Allow generic network logos** is on by default. It allows a generic network
+logo to substitute for an unmatched station, not a confirmed station-specific
+logo. Disable it to avoid these substitutions.
+
 Use **Channels to ignore** below the group table to exclude individual channels
 from Auto Match. This does not prevent an explicit Manual Match. To add all
 skipped and failed channels from the latest Auto Match result, run **Ignore
@@ -90,10 +94,7 @@ variant is available. Remaining ties are skipped.
 
 **Use channel TVG ID as a station hint** is off by default. The station hint reads
 the channel's TVG ID, using its override when set, not the matched EPG entry.
-TVG IDs may be stale and cannot verify a
-station's city. A generic network logo is a substitute, not a confirmed
-station-specific logo. **Allow generic network logos** is on by default; disable
-it to avoid substituting a generic logo for a station.
+TVG IDs may be stale and cannot verify a station's city.
 
 ## Manual assignment
 
