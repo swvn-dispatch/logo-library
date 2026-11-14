@@ -6,7 +6,7 @@ import types
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.dispatcharr import assign_logo, automatic_channels, channel_options, dispatcharr_version, group_options, guarded_assign_logo, ignore_latest_skipped
+from src.dispatcharr import assign_logo, automatic_channels, channel_options, dispatcharr_version, group_options, guarded_assign_logo, ignore_latest_skipped, map_latest_skipped
 
 
 class DispatcharrTests(unittest.TestCase):
@@ -69,6 +69,68 @@ class DispatcharrTests(unittest.TestCase):
             self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
             history.get_task_history.return_value = []
             self.assertEqual(ignore_latest_skipped("/plugin")["status"], "error")
+
+    def test_map_skipped_adds_unique_blank_rows_and_preserves_existing(self):
+        plugin = MagicMock(settings={"mappings": [{"channel": "01", "logo": "existing.png"},
+                                                  {"channel": 2}, {"channel": "3", "ignore": True}],
+                                     "unrelated": "preserved"})
+        model = MagicMock()
+        model.objects.select_for_update.return_value.filter.return_value.first.return_value = plugin
+        db = types.ModuleType("django.db")
+        db.transaction = types.SimpleNamespace(atomic=lambda: nullcontext())
+        loader = types.ModuleType("apps.plugins.loader")
+        loader.normalize_plugin_key = lambda name: name
+        models = types.ModuleType("apps.plugins.models")
+        models.PluginConfig = model
+        history = types.ModuleType("apps.plugins.task_history")
+        history._client = MagicMock()
+        history._client.return_value.get.return_value = '["1", "2", "3", "4", "4", "5"]'
+        history.get_task_history = MagicMock(return_value=[{"action_id": "run_automatic", "status": "partial", "result": {
+            "channel_numbers": True, "ignored_channel_reference": "a" * 32,
+            "channels": {"success": [], "skipped": [{"channel": "12.5", "status": "skipped"}], "failed": []}}}])
+        modules = {"django": types.ModuleType("django"), "django.db": db, "apps": types.ModuleType("apps"),
+                   "apps.plugins": types.ModuleType("apps.plugins"), "apps.plugins.models": models,
+                   "apps.plugins.loader": loader, "apps.plugins.task_history": history}
+        with patch.dict(sys.modules, modules):
+            result = map_latest_skipped("/plugin")
+            self.assertIn("Added 2", result["message"])
+            self.assertIn("prevent Auto Match", result["message"])
+            self.assertEqual(plugin.settings["mappings"], [{"channel": "01", "logo": "existing.png"},
+                {"channel": 2}, {"channel": "3", "ignore": True}, {"channel": "4", "logo": ""},
+                {"channel": "5", "logo": ""}])
+            self.assertEqual(plugin.settings["unrelated"], "preserved")
+            plugin.save.assert_called_once_with(update_fields=["settings"])
+            self.assertIn("Added 0", map_latest_skipped("/plugin")["message"])
+            plugin.save.assert_called_once()
+            history.get_task_history.return_value[0]["result"] = {"channels": [
+                {"channel": "6", "status": "skipped"}, {"channel": "6", "status": "failed"},
+                {"channel": "7", "status": "applied"}]}
+            self.assertIn("Added 1", map_latest_skipped("/plugin")["message"])
+            self.assertEqual(plugin.settings["mappings"][-1], {"channel": "6", "logo": ""})
+            history.get_task_history.return_value[0]["result"] = {
+                "channel_numbers": True, "ignored_channel_reference": "a" * 32,
+                "channels": {"success": [], "skipped": [{"channel": "12.5", "status": "skipped"}], "failed": []}}
+            history._client.return_value.get.return_value = None
+            self.assertEqual(map_latest_skipped("/plugin")["status"], "error")
+            history.get_task_history.return_value[0]["status"] = "running"
+            self.assertEqual(map_latest_skipped("/plugin")["status"], "error")
+
+    def test_map_skipped_rejects_invalid_saved_mappings(self):
+        plugin = MagicMock(settings={"mappings": "invalid"})
+        model = MagicMock()
+        model.objects.select_for_update.return_value.filter.return_value.first.return_value = plugin
+        db = types.ModuleType("django.db")
+        db.transaction = types.SimpleNamespace(atomic=lambda: nullcontext())
+        loader = types.ModuleType("apps.plugins.loader")
+        loader.normalize_plugin_key = lambda name: name
+        models = types.ModuleType("apps.plugins.models")
+        models.PluginConfig = model
+        modules = {"django": types.ModuleType("django"), "django.db": db, "apps": types.ModuleType("apps"),
+                   "apps.plugins": types.ModuleType("apps.plugins"), "apps.plugins.models": models,
+                   "apps.plugins.loader": loader}
+        with patch.dict(sys.modules, modules), patch("src.dispatcharr._latest_skipped_ids", return_value=({"1"}, None)):
+            self.assertEqual(map_latest_skipped("/plugin")["status"], "error")
+            plugin.save.assert_not_called()
 
     def test_automatic_channel_snapshot_uses_effective_values(self):
         row = types.SimpleNamespace(id=1, effective_channel_number=12.5, effective_name="Override", effective_channel_group_id=2, effective_logo_id=3, effective_tvg_id="ABC.us")

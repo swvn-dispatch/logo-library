@@ -137,29 +137,25 @@ def store_skipped_ids(code_dir, ids):
         return None
 
 
-def ignore_latest_skipped(code_dir):
-    """Merge the latest Auto Match's skipped and failed channels into saved settings."""
-    from django.db import transaction
-    from apps.plugins.loader import normalize_plugin_key
-    from apps.plugins.models import PluginConfig
+def _latest_skipped_ids(key):
+    """Return validated channel IDs or a user-facing error from the latest run."""
     from apps.plugins.task_history import get_task_history, _client
     from .mappings import automatic_ignored_channels
 
-    key = normalize_plugin_key(Path(code_dir).name)
     history = get_task_history(key)
     latest = next((item for item in history if item.get("action_id") == "run_automatic"), None)
     if not latest or latest.get("status") == "running":
-        return {"status": "error", "message": "No completed Auto Match result is available. Run Auto Match first."}
+        return None, {"status": "error", "message": "No completed Auto Match result is available. Run Auto Match first."}
     result = latest.get("result")
     if not isinstance(result, dict):
-        return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
+        return None, {"status": "error", "message": "The latest Auto Match has no usable channel results."}
     channels = result.get("channels")
     if isinstance(channels, dict):
         if any(not isinstance(channels.get(key), list) for key in ("success", "skipped", "failed")):
-            return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
+            return None, {"status": "error", "message": "The latest Auto Match has no usable channel results."}
         channels = channels["success"] + channels["skipped"] + channels["failed"]
     if not isinstance(channels, list):
-        return {"status": "error", "message": "The latest Auto Match has no usable channel results."}
+        return None, {"status": "error", "message": "The latest Auto Match has no usable channel results."}
     try:
         token = result.get("ignored_channel_reference")
         if token:
@@ -168,21 +164,35 @@ def ignore_latest_skipped(code_dir):
             client = _client()
             raw = client.get(f"logo_library_skipped:{key}:{token}") if client else None
             if raw is None:
-                return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
+                return None, {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
             values = json.loads(raw)
         elif result.get("channel_numbers") is True:
             if any(isinstance(item, dict) and item.get("status") in {"skipped", "failed"} for item in channels):
-                return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
+                return None, {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
             values = []
         else:
             values = [item["channel"] for item in channels
                       if isinstance(item, dict) and item.get("status") in {"skipped", "failed"}]
         selected = automatic_ignored_channels({"automatic_ignored_channels": values})
     except (KeyError, ValueError, TypeError):
-        return {"status": "error", "message": "The latest Auto Match contains invalid channel results."}
+        return None, {"status": "error", "message": "The latest Auto Match contains invalid channel results."}
     except Exception:
         logger.warning("Could not retrieve skipped channel identities", exc_info=True)
-        return {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
+        return None, {"status": "error", "message": "Channel identities for the latest Auto Match are unavailable. Run Auto Match again."}
+    return selected, None
+
+
+def ignore_latest_skipped(code_dir):
+    """Merge the latest Auto Match's skipped and failed channels into saved settings."""
+    from django.db import transaction
+    from apps.plugins.loader import normalize_plugin_key
+    from apps.plugins.models import PluginConfig
+    from .mappings import automatic_ignored_channels
+
+    key = normalize_plugin_key(Path(code_dir).name)
+    selected, error = _latest_skipped_ids(key)
+    if error:
+        return error
     with transaction.atomic():
         plugin = PluginConfig.objects.select_for_update().filter(key=key).first()
         if plugin is None or not isinstance(plugin.settings, dict):
@@ -196,6 +206,41 @@ def ignore_latest_skipped(code_dir):
             plugin.settings = {**plugin.settings, "automatic_ignored_channels": sorted(existing | selected, key=int)}
             plugin.save(update_fields=["settings"])
     return {"status": "ok", "message": f"Added {len(added)} channels to the ignore list. Reload the plugin and reopen settings before editing the list."}
+
+
+def map_latest_skipped(code_dir):
+    """Append blank manual mappings without replacing any existing channel row."""
+    from django.db import transaction
+    from apps.plugins.loader import normalize_plugin_key
+    from apps.plugins.models import PluginConfig
+
+    key = normalize_plugin_key(Path(code_dir).name)
+    selected, error = _latest_skipped_ids(key)
+    if error:
+        return error
+    with transaction.atomic():
+        plugin = PluginConfig.objects.select_for_update().filter(key=key).first()
+        if plugin is None or not isinstance(plugin.settings, dict):
+            return {"status": "error", "message": "Saved plugin settings are unavailable."}
+        mappings = plugin.settings.get("mappings", [])
+        if not isinstance(mappings, list):
+            return {"status": "error", "message": "Manual mappings must be a list."}
+        existing = set()
+        for row in mappings:
+            if not isinstance(row, dict):
+                continue
+            value = row.get("channel")
+            if isinstance(value, (str, int)) and not isinstance(value, bool) and str(value).isascii() and str(value).isdigit():
+                try:
+                    existing.add(str(int(value)))
+                except ValueError:
+                    continue
+        added = selected - existing
+        if added:
+            plugin.settings = {**plugin.settings, "mappings": mappings + [
+                {"channel": channel, "logo": ""} for channel in sorted(added, key=int)]}
+            plugin.save(update_fields=["settings"])
+    return {"status": "ok", "message": f"Added {len(added)} blank manual mappings. Reload the plugin and reopen settings to choose logos. Until completed or removed, these mappings prevent Auto Match for those channels."}
 
 
 def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected, identity, image, assign=None):

@@ -26,7 +26,15 @@
       "id": "ignore_skipped",
       "label": "Ignore skipped and failed channels",
       "description": "Add skipped and failed channels from the latest Auto Match to the ignore list.",
-      "button_label": "Ignore"
+      "button_label": "Ignore",
+      "button_color": "violet"
+    },
+    {
+      "id": "map_skipped",
+      "label": "Create manual mappings for skipped and failed channels",
+      "description": "Add blank manual mapping rows for skipped and failed channels from the latest Auto Match.",
+      "button_label": "Create",
+      "button_color": "violet"
     },
     {
       "id": "update_catalog",

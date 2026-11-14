@@ -45,10 +45,6 @@ to allow overwriting them for a group. Saved manual mappings take priority,
 including incomplete mappings with a channel selected. Channels outside enabled
 groups are omitted from results; configuration errors are reported.
 
-**Allow generic network logos** is on by default. It allows a generic network
-logo to substitute for an unmatched station, not a confirmed station-specific
-logo. Disable it to avoid these substitutions.
-
 Use **Channels to ignore** below the group table to exclude individual channels
 from Auto Match. This does not prevent an explicit Manual Match. To add all
 skipped and failed channels from the latest Auto Match result, run **Ignore
@@ -104,6 +100,10 @@ variant is available. Remaining ties are skipped.
 the channel's TVG ID, using its override when set, not the matched EPG entry.
 TVG IDs may be stale and cannot verify a station's city.
 
+**Allow generic network logos** is on by default. It allows a generic network
+logo to substitute for an unmatched station, not a confirmed station-specific
+logo. Disable it to avoid these substitutions.
+
 ## Manual assignment
 
 Add a channel and logo path to the mapping table, save, and run **Manual Match**.
@@ -111,6 +111,14 @@ An explicit mapping replaces the channel's existing logo. Duplicate rows,
 missing channels and unavailable logo files are skipped; other valid mappings
 can still be applied. Removing a mapping does not remove or restore its assigned
 logo.
+
+To prepare manual mappings for skipped and failed channels from the latest Auto
+Match, run **Create manual mappings for skipped and failed channels**, then
+reload the plugin and reopen its settings. The action adds blank rows without
+duplicating existing channels or choosing logos. Select a logo for each row,
+save, and run Manual Match. Until completed or removed, blank mappings prevent
+Auto Match from matching those channels. The action requires an available task
+result and its stored channel identities.
 
 The Manual Match result includes the saved manual mapping definitions used for
 the run. The Auto Match result instead includes its group settings, ignored
