@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from .dispatcharr import (assign_logo, automatic_channels, channel_options, dispatcharr_version,
-                          group_options, guarded_assign_logo, ignore_latest_skipped, store_skipped_ids)
+                          group_options, guarded_assign_logo, ignore_latest_skipped, map_latest_skipped, store_skipped_ids)
 from .automatic_run import run_automatic
 from .automatic import configuration_snapshot
 from .fields import make_fields
@@ -65,6 +65,8 @@ class Plugin:
 
         if action == "ignore_skipped":
             return ignore_latest_skipped(context["code_dir"])
+        if action == "map_skipped":
+            return map_latest_skipped(context["code_dir"])
         if action == "run_automatic":
             options = group_options()
             groups = [option["value"] for option in options]

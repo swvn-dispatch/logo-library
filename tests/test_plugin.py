@@ -49,19 +49,22 @@ class PluginTests(unittest.TestCase):
     def test_manifest_contract(self):
         manifest = json.loads((Path(__file__).parents[1] / "src" / "plugin.json").read_text())
         self.assertEqual(manifest["manifest_version"], 2)
-        self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes", "run_automatic", "ignore_skipped"})
-        self.assertTrue(all(action.get("async") for action in manifest["actions"] if action["id"] != "ignore_skipped"))
+        self.assertEqual({action["id"] for action in manifest["actions"]}, {"update_catalog", "apply_changes", "run_automatic", "ignore_skipped", "map_skipped"})
+        self.assertTrue(all(action.get("async") for action in manifest["actions"] if action["id"] not in {"ignore_skipped", "map_skipped"}))
         self.assertEqual(manifest["actions"][0]["id"], "apply_changes")
         manifest_actions = {action["id"]: action for action in manifest["actions"]}
         declared = catalog_actions()
         self.assertEqual(len({action["id"] for action in declared}), len(declared))
         self.assertNotIn("apply_changes", {action["id"] for action in declared})
-        self.assertEqual(set(manifest_actions) - {"apply_changes", "run_automatic", "ignore_skipped"}, {action["id"] for action in declared})
+        self.assertEqual(set(manifest_actions) - {"apply_changes", "run_automatic", "ignore_skipped", "map_skipped"}, {action["id"] for action in declared})
         for action in declared:
             self.assertEqual(manifest_actions[action["id"]], action)
         self.assertEqual(manifest_actions["update_catalog"]["button_color"], "teal")
         self.assertEqual(manifest_actions["update_catalog"]["button_label"], "Refresh")
         self.assertEqual(manifest_actions["ignore_skipped"]["button_label"], "Ignore")
+        self.assertEqual(manifest_actions["ignore_skipped"]["button_color"], "violet")
+        self.assertEqual(manifest_actions["map_skipped"]["button_label"], "Create")
+        self.assertEqual(manifest_actions["map_skipped"]["button_color"], "violet")
         self.assertEqual(manifest_actions["apply_changes"]["button_label"], "Manual Match")
         self.assertEqual(manifest_actions["run_automatic"]["button_label"], "Auto Match")
 
@@ -81,10 +84,12 @@ class PluginTests(unittest.TestCase):
             "instructions", "manual_assignment", "manual_instructions", "mappings",
             "automatic_assignment", "automatic_setup_help", "automatic_group_help",
             "automatic_strategy_help", "automatic_scope_help", "automatic_replace_help",
-            "automatic_groups", "automatic_generic_fallback", "automatic_ignored_channels", "automatic_advanced",
-            "automatic_advanced_help", "automatic_pattern_help", "automatic_ignore_pattern_help", "automatic_name_prefix_help",
-            "automatic_channel_hints", "automatic_ignore_patterns", "automatic_name_cleanup",
-            "automatic_threshold", "automatic_variant",
+            "automatic_groups", "automatic_ignored_channels", "automatic_advanced",
+            "automatic_advanced_help", "automatic_pattern_help", "automatic_hint_channel_mode_help",
+            "automatic_hint_channel_pattern_help", "automatic_hint_case_help", "automatic_hint_path_mode_help",
+            "automatic_hint_path_pattern_help", "automatic_channel_hints", "automatic_ignore_pattern_help",
+            "automatic_ignore_patterns", "automatic_name_prefix_help", "automatic_name_cleanup",
+            "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
             "scheduled_tasks", "scheduled_tasks_help", "schedule_automatic_mode", "schedule_automatic_value",
@@ -108,9 +113,11 @@ class PluginTests(unittest.TestCase):
         self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_replace_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
-        for field_id in ("automatic_advanced_help", "automatic_pattern_help", "automatic_ignore_pattern_help", "automatic_name_prefix_help"):
+        for field_id in ("automatic_advanced_help", "automatic_pattern_help", "automatic_ignore_pattern_help", "automatic_name_prefix_help",
+                         "automatic_hint_channel_mode_help", "automatic_hint_channel_pattern_help", "automatic_hint_case_help",
+                         "automatic_hint_path_mode_help", "automatic_hint_path_pattern_help"):
             self.assertEqual(by_id[field_id]["section"], "automatic_advanced")
-        self.assertIn("CA |", by_id["automatic_pattern_help"]["description"])
+        self.assertIn("CA |", by_id["automatic_hint_channel_pattern_help"]["description"])
         self.assertIn("normal scope", by_id["automatic_pattern_help"]["description"])
         self.assertIn("Manual Match", by_id["automatic_ignore_pattern_help"]["description"])
         for field_id in ("automatic_channel_hints", "automatic_ignore_patterns"):
@@ -132,7 +139,7 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(by_id["automatic_variant"]["default"], "standard")
         self.assertIn({"value": "hd", "label": "Prefer HD variant"}, by_id["automatic_variant"]["options"])
         self.assertTrue(by_id["automatic_generic_fallback"]["default"])
-        self.assertEqual(by_id["automatic_generic_fallback"]["section"], "automatic_assignment")
+        self.assertEqual(by_id["automatic_generic_fallback"]["section"], "automatic_advanced")
         self.assertFalse(by_id["automatic_guide_signals"]["default"])
         self.assertEqual(by_id["automatic_guide_signals"]["label"], "Use channel TVG ID as a station hint")
         self.assertIn("not its matched EPG entry", by_id["automatic_guide_signals"]["description"])
@@ -556,12 +563,18 @@ class PluginTests(unittest.TestCase):
     def test_unknown_action(self):
         self.assertEqual(Plugin().run("unknown", {}, {})["status"], "error")
 
+    def test_map_skipped_action_is_routed(self):
+        with patch("src.map_latest_skipped", return_value={"status": "ok", "message": "done"}) as action:
+            result = Plugin().run("map_skipped", {}, {"code_dir": "/plugin"})
+        action.assert_called_once_with("/plugin")
+        self.assertEqual(result["status"], "ok")
+
     def test_all_action_results_include_versions(self):
         from contextlib import nullcontext
         with patch("src.dispatcharr_version", return_value="v0.33.0-20261114162620"), \
              patch.object(Plugin, "_run", return_value={"status": "ok"}), \
              patch("src.action_lock", return_value=nullcontext(True)):
-            for action in ("run_automatic", "apply_changes", "update_catalog", "ignore_skipped", "unknown"):
+            for action in ("run_automatic", "apply_changes", "update_catalog", "ignore_skipped", "map_skipped", "unknown"):
                 with self.subTest(action=action):
                     result = Plugin().run(action, {}, {"data_dir": "/x"})
                     self.assertEqual(result["plugin_version"], Plugin.version)
