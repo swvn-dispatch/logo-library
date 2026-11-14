@@ -81,7 +81,8 @@ class PluginTests(unittest.TestCase):
             "instructions", "manual_assignment", "manual_instructions", "mappings",
             "automatic_assignment", "automatic_setup_help", "automatic_group_help",
             "automatic_strategy_help", "automatic_scope_help", "automatic_replace_help",
-            "automatic_groups", "automatic_ignored_channels", "automatic_advanced", "automatic_prefix",
+            "automatic_groups", "automatic_ignored_channels", "automatic_advanced", "automatic_pattern_help",
+            "automatic_channel_hints", "automatic_ignore_patterns", "automatic_prefix",
             "automatic_prefix_mode", "automatic_threshold", "automatic_variant", "automatic_generic_fallback",
             "automatic_guide_signals", "catalog_filters_section",
             "catalog_filter_instructions", "catalog_filters",
@@ -106,6 +107,9 @@ class PluginTests(unittest.TestCase):
         self.assertIn("Replace: Allows Auto Match to overwrite existing channel logos.", by_id["automatic_replace_help"]["description"])
         self.assertFalse(any(field["id"].startswith("automatic_default_") for field in fields))
         self.assertTrue(by_id["automatic_advanced"]["collapsed"])
+        for field_id in ("automatic_channel_hints", "automatic_ignore_patterns"):
+            self.assertEqual(by_id[field_id]["section"], "automatic_advanced")
+            self.assertEqual(by_id[field_id]["default"], [])
         self.assertEqual(by_id["automatic_advanced"]["label"], "Automatic assignment - Advanced")
         self.assertNotIn("automatic_prefix_rules", by_id)
         self.assertEqual([column["id"] for column in by_id["automatic_groups"]["columns"]],
@@ -144,6 +148,16 @@ class PluginTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             fields = make_fields(root, settings, [{"value": "1", "label": "First"}])
         self.assertEqual(next(field for field in fields if field["id"] == "automatic_ignored_channels")["default"], [])
+
+    def test_invalid_advanced_patterns_are_visible(self):
+        settings = {"automatic_channel_hints": [{"mode": "regex", "text": "["}],
+                    "automatic_ignore_patterns": [{"mode": "contains", "text": "abc", "case_sensitive": "yes"}]}
+        with tempfile.TemporaryDirectory() as root:
+            fields = make_fields(root, settings, [])
+        error = next(field for field in fields if field["id"] == "automatic_pattern_errors")
+        self.assertEqual(error["section"], "automatic_advanced")
+        self.assertIn("Hint: Row 1", error["description"])
+        self.assertIn("Ignore: Row 1", error["description"])
 
     def test_existing_prefix_rules_remain_editable(self):
         with tempfile.TemporaryDirectory() as root:

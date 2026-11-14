@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from .automatic import compile_groups
 from .callsign_matching import build_callsign_index, build_station_name_index
 from .catalog_scope import scoped_paths
+from .channel_patterns import channel_matches, compile_patterns
 from .filters import catalog_filter_rules, matches
 from .matching_engine import build_network_index, match_channel
 from .mappings import automatic_ignored_channels, manual_disposition
@@ -39,6 +40,12 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
         errors.append(str(exc))
         groups.clear()
     filter_rules, filter_errors = catalog_filter_rules(settings.get("catalog_filters", []), catalogs)
+    hints, hint_errors = compile_patterns(settings.get("automatic_channel_hints", []), hints=True)
+    ignore_patterns, ignore_errors = compile_patterns(settings.get("automatic_ignore_patterns", []))
+    if hint_errors or ignore_errors:
+        errors.extend(f"Channel hint: {error}" for error in hint_errors)
+        errors.extend(f"Ignore pattern: {error}" for error in ignore_errors)
+        groups.clear()
     if filter_errors:
         errors.extend(f"Catalog filter: {error}" for error in filter_errors)
         groups.clear()
@@ -72,7 +79,7 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
         try:
             if counts[channel_id] > 1:
                 reason = "duplicate_channel"
-            elif channel_id in ignored_channels:
+            elif channel_id in ignored_channels or any(channel_matches(channel.get("name", ""), rule) for rule in ignore_patterns):
                 reason = "ignored"
             elif channel_id in manual_rows:
                 reason = manual_disposition(manual_rows[channel_id])
@@ -80,16 +87,26 @@ def run_automatic(data_dir, settings, channels, group_ids, catalogs, assign):
                 reason = "existing_logo"
             else:
                 catalog = catalog_by_id[config["catalog"]]
-                key = (catalog.id, config["scope"])
-                if key not in indices:
-                    paths = catalog_paths[catalog.id]
-                    indices[key] = (build_name_index(paths, catalog.id, config["scope"]),
-                                    build_callsign_index(paths, catalog.id, config["scope"]),
-                                    build_network_index(paths, catalog.id, config["scope"]) if config["generic_fallback"] else None,
-                                    build_station_name_index(paths, catalog.id, config["scope"]))
-                name_index, callsign_index, network_index, station_name_index = indices[key]
-                match = match_channel(channel["name"], config, name_index, callsign_index, catalog.id, network_index,
-                                      channel.get("guide_id"), station_name_index)
+                selected = tuple(i for i, rule in enumerate(hints) if channel_matches(channel["name"], rule))
+
+                def attempt(selection):
+                    key = (catalog.id, config["scope"], config["generic_fallback"], selection)
+                    if key not in indices:
+                        paths = catalog_paths[catalog.id]
+                        if selection is not None:
+                            path_rules = [hints[i][3] for i in selection]
+                            paths = [path for path in paths if matches(path, path_rules)]
+                        indices[key] = (build_name_index(paths, catalog.id, config["scope"]),
+                                        build_callsign_index(paths, catalog.id, config["scope"]),
+                                        build_network_index(paths, catalog.id, config["scope"]) if config["generic_fallback"] else None,
+                                        build_station_name_index(paths, catalog.id, config["scope"]))
+                    name_index, callsign_index, network_index, station_name_index = indices[key]
+                    return match_channel(channel["name"], config, name_index, callsign_index, catalog.id, network_index,
+                                         channel.get("guide_id"), station_name_index)
+
+                match = attempt(selected) if selected else None
+                if match is None or match["reason"] is not None:
+                    match = attempt(None)
                 detail["method"] = match["method"]
                 if match.get("score") is not None:
                     detail["score"] = match["score"]

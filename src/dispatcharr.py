@@ -178,6 +178,7 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
     from apps.plugins.models import PluginConfig
     from . import catalogs
     from .automatic import compile_groups
+    from .channel_patterns import channel_matches, compile_patterns
     from .mappings import automatic_ignored_channels, manual_disposition
 
     with transaction.atomic():
@@ -216,6 +217,11 @@ def guarded_assign_logo(code_dir, channel_id, group_id, name, guide_id, expected
 
         if str(effective("channel_group_id")) != group_id or effective("name") != name:
             return "channel_changed"
+        ignore_patterns, pattern_errors = compile_patterns(settings.get("automatic_ignore_patterns", []))
+        if pattern_errors:
+            return "settings_changed"
+        if any(channel_matches(name, rule) for rule in ignore_patterns):
+            return "ignored"
         if expected["guide_signals"] and effective("tvg_id") != guide_id:
             return "channel_changed"
         if effective("logo_id") is not None and not expected["replace"]:

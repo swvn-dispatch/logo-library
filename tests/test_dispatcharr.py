@@ -67,7 +67,8 @@ class DispatcharrTests(unittest.TestCase):
         settings = {"automatic_groups": [{"group": "2", "strategy": "exact", "catalog": "tv_logos"}], "mappings": []}
         expected = {"strategy": "exact", "catalog": "tv_logos", "scope": "", "replace": False,
                     "prefix": "", "prefix_mode": "literal", "variant": "standard", "generic_fallback": True,
-                    "guide_signals": False, "threshold": 90, "catalog_filters": []}
+                    "guide_signals": False, "threshold": 90, "catalog_filters": [],
+                    "channel_hints": [], "ignore_patterns": []}
         plugin_model, channel_model, override_model, group_model = (MagicMock() for _ in range(4))
         plugin_model.objects.select_for_update.return_value.filter.return_value.first.return_value = types.SimpleNamespace(settings=settings)
         channel = types.SimpleNamespace(channel_group_id=8, name="Raw", logo_id=None)
@@ -125,6 +126,11 @@ class DispatcharrTests(unittest.TestCase):
             settings["catalog_filters"] = [{"mode": "exclude_contains", "text": "abc"}]
             self.assertEqual(guarded_assign_logo(*args), "settings_changed")
             settings.pop("catalog_filters")
+            for key, rule in (("automatic_channel_hints", {"mode": "contains", "text": "Effective", "path_mode": "contains", "path_text": "canada"}),
+                              ("automatic_ignore_patterns", {"mode": "contains", "text": "Effective"})):
+                settings[key] = [rule]
+                self.assertEqual(guarded_assign_logo(*args), "settings_changed")
+                settings.pop(key)
             settings["automatic_guide_signals"] = True
             override.tvg_id = "WABC.us"
             guide_args = ("/plugin", "1", "2", "Effective", "old.us", {**expected, "guide_signals": True},

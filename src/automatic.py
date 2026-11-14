@@ -40,6 +40,12 @@ def configuration_snapshot(settings, group_options, channels=()):
                    if isinstance(row, dict) else {"invalid": True} for row in filters]
     else:
         filters = "<invalid>"
+    def pattern_snapshot(key, columns):
+        rows = settings.get(key, [])
+        if not isinstance(rows, list):
+            return "<invalid>"
+        return [{column: scalar(row.get(column)) for column in columns}
+                if isinstance(row, dict) else {"invalid": True} for row in rows]
     try:
         channel_by_id = {str(channel["id"]): channel for channel in channels}
         ignored = [{"number": channel_by_id.get(channel_id, {}).get("number"),
@@ -59,6 +65,8 @@ def configuration_snapshot(settings, group_options, channels=()):
             "variant_preference": scalar(settings.get("automatic_variant", "standard")),
             "generic_network_fallback": scalar(settings.get("automatic_generic_fallback", True)),
             "guide_id_signals": scalar(settings.get("automatic_guide_signals", False)),
+            "channel_hints": pattern_snapshot("automatic_channel_hints", ("mode", "text", "case_sensitive", "path_mode", "path_text")),
+            "ignore_patterns": pattern_snapshot("automatic_ignore_patterns", ("mode", "text", "case_sensitive")),
         },
         "catalog_filters": filters,
     }
@@ -143,7 +151,9 @@ def compile_groups(rows, group_ids, catalog_ids, settings=None):
                                "prefix": prefix, "prefix_mode": prefix_mode,
                                "variant": variant, "generic_fallback": generic, "guide_signals": guide,
                                "threshold": threshold,
-                               "catalog_filters": deepcopy(settings.get("catalog_filters", []))}
+                               "catalog_filters": deepcopy(settings.get("catalog_filters", [])),
+                               "channel_hints": deepcopy(settings.get("automatic_channel_hints", [])),
+                               "ignore_patterns": deepcopy(settings.get("automatic_ignore_patterns", []))}
         except ValueError as exc:
             errors.append(f"Row {index}: {exc}")
     return compiled, errors
